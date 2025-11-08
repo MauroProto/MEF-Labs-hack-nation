@@ -221,6 +221,7 @@ export interface InvocationContext {
   callStack: Set<string>; // nodeIds in current call chain
   startTime: Date;
   timeout: number;
+  conversationTurns: Map<string, number>; // Track bidirectional conversation counts (for circular dependency prevention)
 }
 
 export interface CachedResult {

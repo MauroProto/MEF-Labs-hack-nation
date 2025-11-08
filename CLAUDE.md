@@ -422,7 +422,7 @@ docker-compose down -v      # Reset database (⚠️ destructive)
 
 ## Agent Types Reference
 
-When implementing agents, reference these 6 types:
+### Original 6 Agent Types (Phase 6)
 
 1. **researcher** - Deep analysis, extracts claims/evidence
 2. **critic** - Validates claims, identifies weaknesses
@@ -431,7 +431,16 @@ When implementing agents, reference these 6 types:
 5. **citation_tracker** - Verifies citations, builds graphs
 6. **web_research** - Searches academic databases
 
+### Debate System Agents (Phase 10 - NEW)
+
+7. **posture_generator** - Creates 3 debate positions with topics and questions
+8. **debater** - Argues a specific posture, asks/answers questions
+9. **judge** - Evaluates debate transcripts using configurable criteria
+10. **report_generator** - Creates final user-facing reports
+
 Each exposes tools via OpenAI function calling format.
+
+**Total: 10 agent types**
 
 ---
 

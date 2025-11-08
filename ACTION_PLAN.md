@@ -1810,15 +1810,222 @@ paper-canvas/
    - `crossExaminationRound(targetPosture)` - Rounds 2-4: Question/answer cycles
    - Enforce turn order: Max 2 questions per debater per posture
    - Track debate state and progress
-2. Implement exchange tracking:
+
+2. **Implement Conversation Turns (Circular Dependency Prevention)**:
+   ```typescript
+   // Update InvocationContext in agent.types.ts
+   export interface InvocationContext {
+     requestId: string;
+     callStack: Set<string>;
+     startTime: Date;
+     timeout: number;
+     conversationTurns: Map<string, number>; // NEW: track turn counts
+   }
+
+   // In agentOrchestrator.ts
+   async invoke(params: AgentInvocationParams, context?: InvocationContext) {
+     const convKey = [params.from, params.to].sort().join('→');
+     const turns = context?.conversationTurns.get(convKey) || 0;
+
+     // For Debater ↔ Researcher calls: limit to 1 turn
+     const maxTurns = this.getMaxTurns(params.from, params.to);
+     if (turns >= maxTurns) {
+       throw new AgentError(
+         ErrorCode.CircularDependency,
+         `Max conversation turns (${maxTurns}) exceeded for ${convKey}`
+       );
+     }
+
+     context.conversationTurns.set(convKey, turns + 1);
+     // ... proceed with invocation
+   }
+
+   private getMaxTurns(from: string, to: string): number {
+     // Debater ↔ Researcher: 1 turn (request → response, no back-and-forth)
+     if ((from.includes('debater') && to.includes('researcher')) ||
+         (from.includes('researcher') && to.includes('debater'))) {
+       return 1;
+     }
+     // Other agent pairs: 3 turns
+     return 3;
+   }
+   ```
+
+3. **Implement Prisma Transaction Patterns (Database Consistency)**:
+   ```typescript
+   // In debateOrchestrator.ts
+   async conductDebate(postures: Posture[], debaters: string[]): Promise<DebateTranscript> {
+     try {
+       // Wrap ALL debate database writes in a transaction
+       const transcript = await prisma.$transaction(async (tx) => {
+         // Create transcript
+         const transcriptRecord = await tx.debateTranscript.create({
+           data: {
+             sessionId: this.sessionId,
+             posturesData: postures,
+             metadata: { startTime: new Date(), participantIds: debaters }
+           }
+         });
+
+         // Run all 4 rounds
+         for (let i = 1; i <= 4; i++) {
+           const round = await this.runRound(i, transcriptRecord.id, tx);
+           // Exchanges are also saved within this transaction
+         }
+
+         // Update session status
+         await tx.debateSession.update({
+           where: { id: this.sessionId },
+           data: { status: 'evaluating', currentRound: 4 }
+         });
+
+         return transcriptRecord;
+       }, {
+         timeout: 120000, // 2 minutes for full debate
+         isolationLevel: 'Serializable' // Prevent race conditions
+       });
+
+       return transcript;
+     } catch (error) {
+       // If ANY step fails, ENTIRE debate is rolled back
+       await this.handleDebateFailure(error);
+       throw error;
+     }
+   }
+
+   // Helper: save round with exchanges atomically
+   private async runRound(
+     roundNum: number,
+     transcriptId: string,
+     tx: PrismaTransaction
+   ): Promise<DebateRound> {
+     const roundRecord = await tx.debateRound.create({
+       data: {
+         transcriptId,
+         roundNumber: roundNum,
+         roundType: roundNum === 1 ? 'exposition' : 'cross_examination',
+         startTime: new Date()
+       }
+     });
+
+     // Conduct round logic...
+     const exchanges = await this.conductRoundExchanges(roundNum);
+
+     // Save all exchanges in same transaction
+     await tx.debateExchange.createMany({
+       data: exchanges.map(ex => ({
+         roundId: roundRecord.id,
+         from: ex.from,
+         to: ex.to,
+         type: ex.type,
+         content: ex.content,
+         topics: ex.topics,
+         timestamp: ex.timestamp
+       }))
+     });
+
+     await tx.debateRound.update({
+       where: { id: roundRecord.id },
+       data: { endTime: new Date() }
+     });
+
+     return roundRecord;
+   }
+   ```
+
+4. **Implement Error Recovery (Graceful Failure Handling)**:
+   ```typescript
+   // In debateOrchestrator.ts
+   private async handleDebateFailure(error: Error): Promise<void> {
+     console.error('Debate failed:', error);
+
+     // 1. Save partial transcript if any exchanges completed
+     if (this.currentRound > 0 && this.exchanges.length > 0) {
+       try {
+         await prisma.debateSession.update({
+           where: { id: this.sessionId },
+           data: {
+             status: 'error',
+             transcript: {
+               upsert: {
+                 create: {
+                   posturesData: this.postures,
+                   metadata: {
+                     startTime: this.startTime,
+                     endTime: new Date(),
+                     totalExchanges: this.exchanges.length,
+                     participantIds: this.debaters,
+                     partialDebate: true,
+                     failureRound: this.currentRound,
+                     errorMessage: error.message
+                   }
+                 },
+                 update: {}
+               }
+             }
+           }
+         });
+       } catch (saveError) {
+         console.error('Failed to save partial transcript:', saveError);
+       }
+     }
+
+     // 2. Emit error event for frontend notification
+     agentBus.error({
+       nodeId: 'debate-orchestrator',
+       error: new AgentError(
+         ErrorCode.InternalError,
+         `Debate failed at round ${this.currentRound}: ${error.message}`,
+         { sessionId: this.sessionId, round: this.currentRound }
+       )
+     });
+   }
+
+   // Retry logic for transient failures
+   private async invokeWithRetry(
+     params: AgentInvocationParams,
+     maxRetries: number = 2
+   ): Promise<AgentInvocationResult> {
+     let lastError: Error;
+
+     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+       try {
+         return await orchestrator.invoke(params);
+       } catch (error) {
+         lastError = error;
+
+         // Only retry on rate limits or timeouts
+         if (error.code === ErrorCode.RateLimitExceeded) {
+           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+           await new Promise(resolve => setTimeout(resolve, delay));
+           continue;
+         }
+
+         if (error.code === ErrorCode.Timeout && attempt < maxRetries) {
+           continue; // Retry timeouts
+         }
+
+         throw error; // Don't retry other errors
+       }
+     }
+
+     throw lastError;
+   }
+   ```
+
+5. Implement exchange tracking:
    - Store all questions and answers
    - Associate exchanges with topics
    - Maintain transcript integrity
-3. Write unit tests for round logic
+
+6. Write unit tests for round logic
 
 **Deliverables**:
-- `backend/src/services/debateOrchestrator.ts` (~350 lines)
+- `backend/src/services/debateOrchestrator.ts` (~450 lines with error handling)
 - 4-round debate structure working
+- Conversation turn limits enforced
+- Database transaction safety guaranteed
+- Graceful error recovery implemented
 - Unit tests for debate flow
 
 **Day 4: Judge & Report Services**
