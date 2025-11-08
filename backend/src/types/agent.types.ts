@@ -99,7 +99,11 @@ export type AgentType =
   | 'synthesizer'
   | 'question_generator'
   | 'citation_tracker'
-  | 'web_research';
+  | 'web_research'
+  | 'posture_generator'
+  | 'debater'
+  | 'judge'
+  | 'report_generator';
 
 export type AgentStatus = 'idle' | 'working' | 'error';
 
@@ -223,6 +227,96 @@ export interface CachedResult {
   result: AgentInvocationResult;
   cachedAt: Date;
   expiresAt: Date;
+}
+
+// ============================================================================
+// Debate System Types
+// ============================================================================
+
+/**
+ * Posture - A debate position with topics and guiding questions
+ */
+export interface Posture {
+  id: string;
+  debaterId: string; // Agent nodeId assigned to this posture
+  perspectiveTemplate: string; // e.g., "Critic", "Advocate", "Synthesizer"
+  topics: string[]; // Topics to cover in debate
+  initialPosition: string; // Starting hypothesis/stance
+  guidingQuestions: string[]; // Questions to explore
+  createdAt: Date;
+}
+
+/**
+ * Exchange - Single communication in debate
+ */
+export interface DebateExchange {
+  id: string;
+  from: string; // Debater nodeId
+  to?: string; // Target debater (for questions)
+  type: 'exposition' | 'question' | 'answer';
+  content: string;
+  topics: string[]; // Which topics this addresses
+  timestamp: Date;
+}
+
+/**
+ * Debate Round - Collection of exchanges in one round
+ */
+export interface DebateRound {
+  roundNumber: 1 | 2 | 3 | 4;
+  roundType: 'exposition' | 'cross_examination';
+  targetPosture?: string; // Posture ID being examined (for cross-examination)
+  exchanges: DebateExchange[];
+  startTime: Date;
+  endTime?: Date;
+}
+
+/**
+ * Debate Transcript - Complete record of debate
+ */
+export interface DebateTranscript {
+  id: string;
+  sessionId: string;
+  postures: Posture[];
+  rounds: DebateRound[];
+  metadata: {
+    startTime: Date;
+    endTime?: Date;
+    totalExchanges: number;
+    participantIds: string[]; // Debater nodeIds
+  };
+}
+
+/**
+ * Judge Verdict - Evaluation result
+ */
+export interface JudgeVerdict {
+  id: string;
+  debateId: string;
+  judgeId: string; // Judge agent nodeId
+  criteria: Record<string, any>; // Configurable evaluation criteria
+  scores: Record<string, number>; // Scores per criterion or per posture
+  reasoning: string; // Judge's detailed reasoning
+  confidence: number; // 0-1
+  verdict: string; // Final judgment
+  timestamp: Date;
+}
+
+/**
+ * Debate Session - Full debate workflow
+ */
+export interface DebateSession {
+  id: string;
+  paperId?: string; // Reference to analyzed paper
+  researchAnalysis: string; // Output from researcher agent
+  postures: Posture[];
+  transcript?: DebateTranscript;
+  verdict?: JudgeVerdict;
+  finalReport?: string; // Output from report generator
+  status: 'initializing' | 'debating' | 'evaluating' | 'completed' | 'error';
+  currentRound?: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ============================================================================
