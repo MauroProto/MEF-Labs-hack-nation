@@ -149,3 +149,103 @@ model WebSearchResult {
   @@index([queryHash])
   @@index([expiresAt])
 }
+
+// ============================================================================
+// Debate System Models
+// ============================================================================
+
+// DebateSession Model - Full debate workflow
+model DebateSession {
+  id               String           @id @default(cuid())
+  paperId          String?          // Reference to analyzed paper
+  researchAnalysis String           @db.Text
+  status           String           @default("initializing") // "initializing", "debating", "evaluating", "completed", "error"
+  currentRound     Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  postures         Posture[]
+  transcript       DebateTranscript?
+  verdict          JudgeVerdict?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Posture Model - Debate position with topics
+model Posture {
+  id                  String        @id @default(cuid())
+  sessionId           String
+  session             DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  debaterId           String // Agent nodeId
+  perspectiveTemplate String // "Critic", "Advocate", etc.
+  topics              Json // Array of topic strings
+  initialPosition     String        @db.Text
+  guidingQuestions    Json // Array of question strings
+  createdAt           DateTime      @default(now())
+
+  @@index([sessionId])
+  @@index([debaterId])
+}
+
+// DebateTranscript Model - Complete debate record
+model DebateTranscript {
+  id            String        @id @default(cuid())
+  sessionId     String        @unique
+  session       DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  posturesData  Json // Snapshot of postures at debate time
+  metadata      Json // { startTime, endTime, totalExchanges, participantIds }
+  createdAt     DateTime      @default(now())
+  rounds        DebateRound[]
+
+  @@index([sessionId])
+}
+
+// DebateRound Model - Collection of exchanges in one round
+model DebateRound {
+  id              String           @id @default(cuid())
+  transcriptId    String
+  transcript      DebateTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  roundNumber     Int // 1, 2, 3, or 4
+  roundType       String // "exposition" or "cross_examination"
+  targetPostureId String? // For cross-examination rounds
+  startTime       DateTime
+  endTime         DateTime?
+  exchanges       DebateExchange[]
+
+  @@index([transcriptId])
+  @@index([roundNumber])
+}
+
+// DebateExchange Model - Single communication in debate
+model DebateExchange {
+  id        String      @id @default(cuid())
+  roundId   String
+  round     DebateRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  from      String // Debater nodeId
+  to        String? // Target debater nodeId (for questions)
+  type      String // "exposition", "question", or "answer"
+  content   String      @db.Text
+  topics    Json // Array of topic strings
+  timestamp DateTime    @default(now())
+
+  @@index([roundId])
+  @@index([from])
+  @@index([timestamp])
+}
+
+// JudgeVerdict Model - Evaluation result
+model JudgeVerdict {
+  id        String        @id @default(cuid())
+  sessionId String        @unique
+  session   DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  judgeId   String // Judge agent nodeId
+  criteria  Json // Evaluation criteria
+  scores    Json // Scores per criterion or per posture
+  reasoning String        @db.Text
+  confidence Float        @default(0.5)
+  verdict   String        @db.Text
+  timestamp DateTime      @default(now())
+
+  @@index([sessionId])
+  @@index([judgeId])
+}

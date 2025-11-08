@@ -216,6 +216,106 @@ model WebSearchResult {
   @@index([queryHash])
   @@index([expiresAt])
 }
+
+// ============================================================================
+// Debate System Models (NEW - Multi-Agent Debate Architecture)
+// ============================================================================
+
+// DebateSession Model - Full debate workflow
+model DebateSession {
+  id               String            @id @default(cuid())
+  paperId          String?           // Reference to analyzed paper
+  researchAnalysis String            @db.Text
+  status           String            @default("initializing") // "initializing", "debating", "evaluating", "completed", "error"
+  currentRound     Int?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  postures         Posture[]
+  transcript       DebateTranscript?
+  verdict          JudgeVerdict?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Posture Model - Debate position with topics
+model Posture {
+  id                  String        @id @default(cuid())
+  sessionId           String
+  session             DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  debaterId           String // Agent nodeId
+  perspectiveTemplate String // "Critic", "Advocate", etc.
+  topics              Json // Array of topic strings
+  initialPosition     String        @db.Text
+  guidingQuestions    Json // Array of question strings
+  createdAt           DateTime      @default(now())
+
+  @@index([sessionId])
+  @@index([debaterId])
+}
+
+// DebateTranscript Model - Complete debate record
+model DebateTranscript {
+  id            String        @id @default(cuid())
+  sessionId     String        @unique
+  session       DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  posturesData  Json // Snapshot of postures at debate time
+  metadata      Json // { startTime, endTime, totalExchanges, participantIds }
+  createdAt     DateTime      @default(now())
+  rounds        DebateRound[]
+
+  @@index([sessionId])
+}
+
+// DebateRound Model - Collection of exchanges in one round
+model DebateRound {
+  id              String           @id @default(cuid())
+  transcriptId    String
+  transcript      DebateTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  roundNumber     Int // 1, 2, 3, or 4
+  roundType       String // "exposition" or "cross_examination"
+  targetPostureId String? // For cross-examination rounds
+  startTime       DateTime
+  endTime         DateTime?
+  exchanges       DebateExchange[]
+
+  @@index([transcriptId])
+  @@index([roundNumber])
+}
+
+// DebateExchange Model - Single communication in debate
+model DebateExchange {
+  id        String      @id @default(cuid())
+  roundId   String
+  round     DebateRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  from      String // Debater nodeId
+  to        String? // Target debater nodeId (for questions)
+  type      String // "exposition", "question", or "answer"
+  content   String      @db.Text
+  topics    Json // Array of topic strings
+  timestamp DateTime    @default(now())
+
+  @@index([roundId])
+  @@index([from])
+  @@index([timestamp])
+}
+
+// JudgeVerdict Model - Evaluation result
+model JudgeVerdict {
+  id        String        @id @default(cuid())
+  sessionId String        @unique
+  session   DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  judgeId   String // Judge agent nodeId
+  criteria  Json // Evaluation criteria
+  scores    Json // Scores per criterion or per posture
+  reasoning String        @db.Text
+  confidence Float        @default(0.5)
+  verdict   String        @db.Text
+  timestamp DateTime      @default(now())
+
+  @@index([sessionId])
+  @@index([judgeId])
+}
 ```
 
 ### Key Relationships
@@ -225,6 +325,11 @@ model WebSearchResult {
 3. **Agent → AgentMessage**: One-to-many (agents produce multiple messages)
 4. **Agent → AgentInvocation**: Many-to-many (agents can call each other)
 5. **AgentCapability**: Standalone registry of tool schemas
+6. **DebateSession → Posture**: One-to-many (one debate has 3 postures)
+7. **DebateSession → DebateTranscript**: One-to-one (debate produces one transcript)
+8. **DebateTranscript → DebateRound**: One-to-many (transcript has 4 rounds)
+9. **DebateRound → DebateExchange**: One-to-many (each round has multiple exchanges)
+10. **DebateSession → JudgeVerdict**: One-to-one (one judge verdict per debate)
 
 ---
 
@@ -1655,6 +1760,511 @@ paper-canvas/
 
 ---
 
+### Phase 10: Multi-Agent Debate System (NEW)
+
+**Goal**: Implement question-driven multi-agent debate architecture with structured rounds
+
+**Duration**: 9 days (can be reduced to 5-6 days with 3 developers in parallel)
+
+> **Note**: This phase implements a novel debate architecture based on 2024-2025 research in multi-agent collaboration. The system uses structured turn-based debates with question-driven postures, enabling transparent reasoning and emergent insights.
+
+#### Developer 1: Debate Orchestrator & Backend Services (Days 1-5)
+
+**Day 1: Type Definitions & Database**
+**Tasks**:
+1. Extend `backend/src/types/agent.types.ts`:
+   - Add 4 new agent types: `posture_generator`, `debater`, `judge`, `report_generator`
+   - Define `Posture`, `DebateTranscript`, `DebateRound`, `DebateExchange`, `JudgeVerdict`, `DebateSession` types
+2. Update `backend/prisma/schema.prisma`:
+   - Add debate system models (DebateSession, Posture, DebateTranscript, DebateRound, DebateExchange, JudgeVerdict)
+   - Run Prisma migrations
+3. Verify database schema
+
+**Deliverables**:
+- Extended agent.types.ts with debate types
+- Updated Prisma schema with 6 new models
+- Migration successful
+
+**Day 2: Agent Tool Schemas**
+**Tasks**:
+1. Update `backend/src/services/agentCapability.ts`:
+   - Add `seedDebateTools()` method
+   - Define tool schemas for 4 new agent types:
+     - Posture Generator: `generate_postures(paper_analysis) → postures[]`
+     - Debater: `present_posture()`, `generate_questions()`, `answer_questions()`
+     - Judge: `evaluate_debate(transcript, criteria) → verdict`
+     - Report Generator: `generate_report(debate, verdict) → report`
+2. Update registry initialization in `backend/src/services/agentRegistry.ts`:
+   - Add new agent types to supported types list
+
+**Deliverables**:
+- Tool schemas for 4 new agent types
+- Updated capability seeding
+- Registry supports new agent types
+
+**Day 3: Debate Orchestrator Service**
+**Tasks**:
+1. Create `backend/src/services/debateOrchestrator.ts`:
+   - `conductDebate(postures, debaters) → DebateTranscript`
+   - `expositionRound()` - Round 1: Each debater presents their posture
+   - `crossExaminationRound(targetPosture)` - Rounds 2-4: Question/answer cycles
+   - Enforce turn order: Max 2 questions per debater per posture
+   - Track debate state and progress
+
+2. **Implement Conversation Turns (Circular Dependency Prevention)**:
+   ```typescript
+   // Update InvocationContext in agent.types.ts
+   export interface InvocationContext {
+     requestId: string;
+     callStack: Set<string>;
+     startTime: Date;
+     timeout: number;
+     conversationTurns: Map<string, number>; // NEW: track turn counts
+   }
+
+   // In agentOrchestrator.ts
+   async invoke(params: AgentInvocationParams, context?: InvocationContext) {
+     const convKey = [params.from, params.to].sort().join('→');
+     const turns = context?.conversationTurns.get(convKey) || 0;
+
+     // For Debater ↔ Researcher calls: limit to 1 turn
+     const maxTurns = this.getMaxTurns(params.from, params.to);
+     if (turns >= maxTurns) {
+       throw new AgentError(
+         ErrorCode.CircularDependency,
+         `Max conversation turns (${maxTurns}) exceeded for ${convKey}`
+       );
+     }
+
+     context.conversationTurns.set(convKey, turns + 1);
+     // ... proceed with invocation
+   }
+
+   private getMaxTurns(from: string, to: string): number {
+     // Debater ↔ Researcher: 1 turn (request → response, no back-and-forth)
+     if ((from.includes('debater') && to.includes('researcher')) ||
+         (from.includes('researcher') && to.includes('debater'))) {
+       return 1;
+     }
+     // Other agent pairs: 3 turns
+     return 3;
+   }
+   ```
+
+3. **Implement Prisma Transaction Patterns (Database Consistency)**:
+   ```typescript
+   // In debateOrchestrator.ts
+   async conductDebate(postures: Posture[], debaters: string[]): Promise<DebateTranscript> {
+     try {
+       // Wrap ALL debate database writes in a transaction
+       const transcript = await prisma.$transaction(async (tx) => {
+         // Create transcript
+         const transcriptRecord = await tx.debateTranscript.create({
+           data: {
+             sessionId: this.sessionId,
+             posturesData: postures,
+             metadata: { startTime: new Date(), participantIds: debaters }
+           }
+         });
+
+         // Run all 4 rounds
+         for (let i = 1; i <= 4; i++) {
+           const round = await this.runRound(i, transcriptRecord.id, tx);
+           // Exchanges are also saved within this transaction
+         }
+
+         // Update session status
+         await tx.debateSession.update({
+           where: { id: this.sessionId },
+           data: { status: 'evaluating', currentRound: 4 }
+         });
+
+         return transcriptRecord;
+       }, {
+         timeout: 120000, // 2 minutes for full debate
+         isolationLevel: 'Serializable' // Prevent race conditions
+       });
+
+       return transcript;
+     } catch (error) {
+       // If ANY step fails, ENTIRE debate is rolled back
+       await this.handleDebateFailure(error);
+       throw error;
+     }
+   }
+
+   // Helper: save round with exchanges atomically
+   private async runRound(
+     roundNum: number,
+     transcriptId: string,
+     tx: PrismaTransaction
+   ): Promise<DebateRound> {
+     const roundRecord = await tx.debateRound.create({
+       data: {
+         transcriptId,
+         roundNumber: roundNum,
+         roundType: roundNum === 1 ? 'exposition' : 'cross_examination',
+         startTime: new Date()
+       }
+     });
+
+     // Conduct round logic...
+     const exchanges = await this.conductRoundExchanges(roundNum);
+
+     // Save all exchanges in same transaction
+     await tx.debateExchange.createMany({
+       data: exchanges.map(ex => ({
+         roundId: roundRecord.id,
+         from: ex.from,
+         to: ex.to,
+         type: ex.type,
+         content: ex.content,
+         topics: ex.topics,
+         timestamp: ex.timestamp
+       }))
+     });
+
+     await tx.debateRound.update({
+       where: { id: roundRecord.id },
+       data: { endTime: new Date() }
+     });
+
+     return roundRecord;
+   }
+   ```
+
+4. **Implement Error Recovery (Graceful Failure Handling)**:
+   ```typescript
+   // In debateOrchestrator.ts
+   private async handleDebateFailure(error: Error): Promise<void> {
+     console.error('Debate failed:', error);
+
+     // 1. Save partial transcript if any exchanges completed
+     if (this.currentRound > 0 && this.exchanges.length > 0) {
+       try {
+         await prisma.debateSession.update({
+           where: { id: this.sessionId },
+           data: {
+             status: 'error',
+             transcript: {
+               upsert: {
+                 create: {
+                   posturesData: this.postures,
+                   metadata: {
+                     startTime: this.startTime,
+                     endTime: new Date(),
+                     totalExchanges: this.exchanges.length,
+                     participantIds: this.debaters,
+                     partialDebate: true,
+                     failureRound: this.currentRound,
+                     errorMessage: error.message
+                   }
+                 },
+                 update: {}
+               }
+             }
+           }
+         });
+       } catch (saveError) {
+         console.error('Failed to save partial transcript:', saveError);
+       }
+     }
+
+     // 2. Emit error event for frontend notification
+     agentBus.error({
+       nodeId: 'debate-orchestrator',
+       error: new AgentError(
+         ErrorCode.InternalError,
+         `Debate failed at round ${this.currentRound}: ${error.message}`,
+         { sessionId: this.sessionId, round: this.currentRound }
+       )
+     });
+   }
+
+   // Retry logic for transient failures
+   private async invokeWithRetry(
+     params: AgentInvocationParams,
+     maxRetries: number = 2
+   ): Promise<AgentInvocationResult> {
+     let lastError: Error;
+
+     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+       try {
+         return await orchestrator.invoke(params);
+       } catch (error) {
+         lastError = error;
+
+         // Only retry on rate limits or timeouts
+         if (error.code === ErrorCode.RateLimitExceeded) {
+           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+           await new Promise(resolve => setTimeout(resolve, delay));
+           continue;
+         }
+
+         if (error.code === ErrorCode.Timeout && attempt < maxRetries) {
+           continue; // Retry timeouts
+         }
+
+         throw error; // Don't retry other errors
+       }
+     }
+
+     throw lastError;
+   }
+   ```
+
+5. Implement exchange tracking:
+   - Store all questions and answers
+   - Associate exchanges with topics
+   - Maintain transcript integrity
+
+6. Write unit tests for round logic
+
+**Deliverables**:
+- `backend/src/services/debateOrchestrator.ts` (~450 lines with error handling)
+- 4-round debate structure working
+- Conversation turn limits enforced
+- Database transaction safety guaranteed
+- Graceful error recovery implemented
+- Unit tests for debate flow
+
+**Day 4: Judge & Report Services**
+**Tasks**:
+1. Create `backend/src/services/judgeService.ts`:
+   - `evaluateDebate(transcript, criteria) → Verdict`
+   - Criteria-based assessment (configurable)
+   - Score aggregation
+   - Reasoning generation
+2. Create `backend/src/services/reportGenerator.ts`:
+   - `generateReport(debate, verdict) → formatted output`
+   - Templates for different report formats
+   - Include all perspectives + judge verdict
+   - Export options (JSON, Markdown, PDF-ready)
+3. Integration tests
+
+**Deliverables**:
+- `backend/src/services/judgeService.ts` (~200 lines)
+- `backend/src/services/reportGenerator.ts` (~250 lines)
+- Working evaluation pipeline
+
+**Day 5: HTTP API & WebSocket Events**
+**Tasks**:
+1. Create `backend/src/routes/debateRoutes.ts`:
+   - `POST /api/debates/start` - Initiate debate session
+   - `GET /api/debates/:id` - Get debate transcript
+   - `GET /api/debates/:id/status` - Get current round/status
+   - `PUT /api/debates/:id/round` - Advance to next round
+2. Update `backend/src/lib/websocket.ts`:
+   - Add WebSocket events for real-time debate updates:
+     - `debate:session_started`
+     - `debate:round_start`
+     - `debate:exchange`
+     - `debate:round_end`
+     - `debate:completed`
+   - Forward debate events from orchestrator
+3. Update `backend/src/index.ts` to mount debate routes
+
+**Deliverables**:
+- `backend/src/routes/debateRoutes.ts` (~150 lines)
+- WebSocket events for debate tracking
+- API endpoints integrated
+
+---
+
+#### Developer 2: Agent Definitions & Controllers (Days 1-5)
+
+**Day 1-2: Agent Type Extensions**
+**Tasks**:
+1. Update existing agent infrastructure:
+   - Verify new agent types work with existing registry
+   - Test capability registration
+   - Validate tool schema format
+2. Document agent interaction patterns:
+   - How posture generator creates debate themes
+   - How debaters call researcher for clarification
+   - How judge evaluates debate transcripts
+
+**Deliverables**:
+- Documentation of debate agent patterns
+- Validation tests for new agent types
+
+**Day 3: Debate Controller**
+**Tasks**:
+1. Create `backend/src/controllers/debateController.ts`:
+   - `startDebateSession` - Initialize debate from paper analysis
+   - `getDebateStatus` - Return current debate state
+   - `getDebateTranscript` - Return full or partial transcript
+   - `evaluateDebate` - Trigger judge evaluation
+   - `generateReport` - Create final report
+2. Add request validation with Zod schemas
+3. Error handling for debate-specific errors
+
+**Deliverables**:
+- `backend/src/controllers/debateController.ts` (~300 lines)
+- Request/response validation
+
+**Day 4-5: Integration & Testing**
+**Tasks**:
+1. End-to-end testing:
+   - Full flow: PDF → Researcher → Posture Gen → Debate → Judge → Report
+   - Verify turn enforcement (max 2 questions per debater)
+   - Check circular dependency prevention
+   - Validate WebSocket events
+2. Performance testing:
+   - Debate completion time
+   - Database query optimization
+   - Memory usage during long debates
+3. Error scenario testing:
+   - Agent timeout during debate
+   - Invalid posture generation
+   - Judge evaluation failure
+
+**Deliverables**:
+- Integration tests
+- Performance benchmarks
+- Error handling validated
+
+---
+
+#### Developer 3: Frontend Debate Visualization (Days 1-5)
+
+**Day 1-2: Debate Hooks & State Management**
+**Tasks**:
+1. Create `frontend/lib/hooks/useDebate.ts`:
+   - `useDebateSession(sessionId)` - Track debate state
+   - `useDebateTranscript(sessionId)` - Subscribe to exchanges
+   - `useDebateStatus(sessionId)` - Monitor current round/progress
+2. Create `frontend/lib/stores/debateStore.ts` (Zustand):
+   - Store active debate sessions
+   - Track current round and exchanges
+   - Manage debate history
+3. WebSocket integration:
+   - Subscribe to debate events
+   - Update state in real-time
+   - Handle reconnection
+
+**Deliverables**:
+- `frontend/lib/hooks/useDebate.ts` (~200 lines)
+- `frontend/lib/stores/debateStore.ts` (~150 lines)
+- WebSocket event handlers
+
+**Day 3: Debate UI Components**
+**Tasks**:
+1. Create `frontend/components/debate/`:
+   - `PostureCard.tsx` - Display posture with topics and questions
+   - `DebateTimeline.tsx` - Visual timeline showing all 4 rounds
+   - `ExchangeView.tsx` - Display questions/answers with formatting
+   - `RoundIndicator.tsx` - Show current round and progress
+   - `JudgeVerdict.tsx` - Display evaluation results
+2. Install additional shadcn components:
+   - Timeline, Accordion, Progress
+3. Styling with Tailwind CSS
+
+**Deliverables**:
+- 5 debate components
+- shadcn/ui components integrated
+
+**Day 4: Debate Page**
+**Tasks**:
+1. Create `frontend/app/debate/page.tsx`:
+   - PDF upload section
+   - Researcher analysis display
+   - Posture generation view
+   - Live debate visualization
+   - Judge verdict display
+   - Final report download
+2. Real-time updates via WebSocket
+3. Progress indicators for each stage
+4. Error handling and retry logic
+
+**Deliverables**:
+- Complete debate page with full workflow
+- Real-time visualization working
+
+**Day 5: Testing & Refinement**
+**Tasks**:
+1. E2E testing:
+   - Upload PDF → See final report
+   - Verify all 4 rounds display correctly
+   - Check real-time updates appear
+   - Test error states
+2. UI/UX polish:
+   - Smooth animations
+   - Loading states
+   - Error messages
+   - Responsive design
+3. Accessibility:
+   - Keyboard navigation
+   - Screen reader support
+   - Color contrast
+
+**Deliverables**:
+- Polished debate UI
+- E2E tests passing
+- Accessible interface
+
+---
+
+#### Debate System Architecture
+
+**Flow**:
+```
+Stage 1: Paper Analysis
+PDF → Researcher Agent → Deep analysis
+
+Stage 2: Posture Generation
+Analysis → Posture Generator → 3 postures (with topics & questions)
+
+Stage 3: Structured 4-Round Debate
+Round 1: Exposition (3 turns)
+  - Each debater presents their posture + topics
+
+Round 2-4: Cross-Examination (3 rounds)
+  - For each posture, other 2 debaters ask up to 2 questions each
+  - Posture owner responds to all questions
+  - Total: ~4 questions per posture
+
+Debate Output: Full transcript with all exchanges
+
+Stage 4: Evaluation
+Single Judge → Evaluates all postures + debate quality → Verdict
+
+Stage 5: Report Generation
+Report Generator → Synthesizes debate + verdict → Final report
+```
+
+**Key Features**:
+- **Predictable Structure**: Fixed 4 rounds, max 2 questions per debater
+- **No Circular Dependencies**: Round-based prevents infinite loops
+- **Topic-Driven**: Postures come with assigned topics to cover
+- **Transparent Process**: Full transcript preserved
+- **Configurable Criteria**: Judge uses customizable evaluation rubric
+
+**Technologies**:
+- TypeScript strict mode for all debate types
+- Zod validation for debate schemas
+- WebSocket for real-time updates
+- Prisma for persistence
+- shadcn/ui for debate visualization
+
+**Research Foundations**:
+Based on 2024-2025 multi-agent debate research:
+- Question-driven posture generation (novel approach)
+- Structured turn-based debate (prevents chaos)
+- Single-judge evaluation (simplicity while maintaining quality)
+- Full transcript preservation (transparency)
+
+**Success Criteria**:
+- ✅ 4-round debate completes without errors
+- ✅ Question limits enforced (max 2 per debater)
+- ✅ No circular dependency errors
+- ✅ Judge produces valid evaluation
+- ✅ Report generator creates readable output
+- ✅ WebSocket events fire in real-time
+- ✅ Full flow: PDF → Final report works end-to-end
+
+---
+
 ## Task Distribution Strategy
 
 ### Parallel Work Recommendations
@@ -1665,12 +2275,14 @@ paper-canvas/
 - Phase 5 (all node types are independent)
 - Phase 6 (all agents are independent)
 - Phase 7 (all visualization nodes are independent)
+- Phase 10 (all 3 devs work in parallel on debate system components)
 
 **Phases that require synchronization**:
-- Phase 2 (agent communication layer must be complete before Phase 6)
+- Phase 2 (agent communication layer must be complete before Phase 6 and Phase 10)
 - Phase 4 (backend foundation must be complete before Phase 5)
 - Phase 8 (depends on all previous phases)
 - Phase 9 (testing requires complete system)
+- Phase 10 (requires Phase 2 to be complete for debate orchestration)
 
 ### Communication Checkpoints
 

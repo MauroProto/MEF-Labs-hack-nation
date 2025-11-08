@@ -1,0 +1,129 @@
+/**
+ * BaseNode Component
+ *
+ * Reusable base component for all node types.
+ * Features:
+ * - Color-coded header by node type
+ * - 4-directional handles (top, right, bottom, left)
+ * - Lock/unlock functionality
+ * - Delete button
+ * - Selection ring styling
+ * - Hover effects
+ */
+
+'use client';
+
+import React from 'react';
+import { Handle, Position, NodeResizer, useReactFlow } from '@xyflow/react';
+import { Lock, Unlock, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useCanvasStore } from '@/lib/stores/canvasStore';
+import type { NodeConfig } from '@/lib/nodeTypes';
+
+export interface BaseNodeProps {
+  id: string;
+  data: {
+    label: string;
+    config: NodeConfig;
+    locked?: boolean;
+  };
+  selected?: boolean;
+  children?: React.ReactNode;
+}
+
+export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
+  const { config, locked = false } = data;
+  const { toggleNodeLock } = useCanvasStore();
+  const { deleteElements } = useReactFlow();
+
+  const handleLockToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleNodeLock(id);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
+
+  const Icon = config.icon;
+
+  return (
+    <div
+      className={cn(
+        'rounded-lg border bg-white text-gray-900 h-full w-full',
+        selected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200',
+        locked && 'nopan'
+      )}
+      style={{ minWidth: config.defaultWidth, minHeight: config.defaultHeight }}
+    >
+      {/* Node Resizer - only show when selected */}
+      {selected && !locked && (
+        <NodeResizer
+          minWidth={config.defaultWidth}
+          minHeight={config.defaultHeight}
+          isVisible={selected}
+          lineClassName="border-blue-500"
+          handleClassName="h-3 w-3 bg-white border-2 border-blue-500 rounded"
+        />
+      )}
+
+      {/* Handles for connections */}
+      {config.hasInput && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className="h-2.5 w-2.5 !bg-gray-400 border border-white"
+        />
+      )}
+
+      {config.hasOutput && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className="h-2.5 w-2.5 !bg-gray-400 border border-white"
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-2.5 py-1.5 bg-white border-b border-gray-200 rounded-t-lg">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-1 rounded-sm" style={{ backgroundColor: config.color }} />
+          <Icon className="h-3.5 w-3.5 text-gray-600" />
+          <span className="font-medium text-xs text-gray-900">{data.label}</span>
+        </div>
+
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={handleLockToggle}
+            className="rounded p-0.5 hover:bg-gray-100"
+            title={locked ? 'Unlock' : 'Lock'}
+          >
+            {locked ? <Lock className="h-3 w-3 text-gray-500" /> : <Unlock className="h-3 w-3 text-gray-500" />}
+          </button>
+
+          <button
+            onClick={handleDelete}
+            className="rounded p-0.5 hover:bg-gray-100"
+            title="Delete"
+          >
+            <Trash2 className="h-3 w-3 text-gray-500" />
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div
+        className="text-xs text-gray-700 overflow-hidden"
+        style={{
+          height: 'calc(100% - 36px)',
+          minHeight: `calc(${config.defaultHeight}px - 36px)`
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
