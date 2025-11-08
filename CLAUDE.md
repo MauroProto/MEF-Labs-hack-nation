@@ -1,6 +1,7 @@
 # Claude Context Guide for Research Agent Canvas
 
 This document helps developers on this project provide optimal context to Claude for better code generation and assistance.
+Always use context7 MCP when working with different libraries and frameworks.
 
 ---
 
