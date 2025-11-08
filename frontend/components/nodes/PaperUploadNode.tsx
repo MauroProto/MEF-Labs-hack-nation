@@ -57,28 +57,43 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
       // Extraer texto si es PDF (cliente) para dar contexto al Chat
       let extractedText = '';
       const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      console.log('[PaperUpload] File type:', file.type, 'isPdf:', isPdf);
+
       if (isPdf) {
         try {
+          console.log('[PaperUpload] Starting PDF text extraction...');
           const arrayBuffer = await file.arrayBuffer();
           const pdfjs: any = await import('pdfjs-dist');
-          // Worker desde CDN (alineado a lock actual)
+
+          // Worker desde CDN
           if (pdfjs.GlobalWorkerOptions) {
             pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
           }
+
           const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
           const pdf = await loadingTask.promise;
-          const maxPages = Math.min(pdf.numPages, 12); // Limitar para rendimiento
-          for (let p = 1; p <= maxPages; p++) {
+
+          console.log(`[PaperUpload] PDF loaded. Total pages: ${pdf.numPages}`);
+
+          // Extraer TODAS las páginas del PDF (no limitar)
+          for (let p = 1; p <= pdf.numPages; p++) {
             const page = await pdf.getPage(p);
             const content = await page.getTextContent();
             const text = content.items
               .map((it: any) => ('str' in it ? it.str : ''))
               .join(' ');
-            extractedText += text + '\n';
+            extractedText += text + '\n\n';
           }
+
           extractedText = extractedText.trim();
+          console.log(`[PaperUpload] ✅ Extracted ${extractedText.length} characters from ${pdf.numPages} pages`);
+
+          if (extractedText.length === 0) {
+            console.warn('[PaperUpload] ⚠️ WARNING: PDF text extraction returned 0 characters!');
+          }
         } catch (err) {
-          console.warn('PDF text extraction failed, using placeholder.', err);
+          console.error('[PaperUpload] ❌ PDF text extraction FAILED:', err);
         }
       }
 
@@ -88,7 +103,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         title: file.name.replace(/\.[^/.]+$/, ''),
         authors: [{ name: 'Unknown Author' }],
         abstract: null,
-        fullText: extractedText || 'Uploaded PDF (preview available).',
+        fullText: extractedText || `ERROR: Could not extract text from PDF "${file.name}". The PDF might be image-based or encrypted.`,
         citations: [],
         metadata: {
           uploadedAt: new Date(),
@@ -97,10 +112,19 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         },
       };
 
+      console.log('[PaperUpload] Paper data created:', {
+        id: paperData.id,
+        title: paperData.title,
+        textLength: paperData.fullText.length,
+        hasText: extractedText.length > 0
+      });
+
       addPaper(paperData);
       connectNodeToPaper(id, paperData.id);
       data.lastPaperId = paperData.id;
-      data.lastPaperId = paperData.id;
+
+      console.log(`[PaperUpload] ✅ Paper added to store and connected to node ${id}`);
+
       setUploaded(true);
       setTimeout(() => setUploaded(false), 3000);
     } catch (error) {

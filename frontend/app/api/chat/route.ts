@@ -15,6 +15,13 @@ export async function POST(request: NextRequest) {
   try {
     const { messages, paperContext } = await request.json();
 
+    console.log('[Chat API] Request received:', {
+      messageCount: messages?.length,
+      hasPaperContext: !!paperContext,
+      paperTitle: paperContext?.title,
+      textLength: paperContext?.fullText?.length
+    });
+
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { error: 'Messages array is required' },
@@ -32,12 +39,14 @@ Title: ${paperContext.title}
 Authors: ${paperContext.authors?.map((a: any) => a.name).join(', ') || 'Unknown'}
 ${paperContext.abstract ? `Abstract: ${paperContext.abstract}` : ''}
 
-Full text excerpt:
-${paperContext.fullText?.substring(0, 3000) || ''}
+Full text (${paperContext.fullText?.length || 0} characters):
+${paperContext.fullText || 'No text available'}
 
 Please answer questions about this paper accurately and helpfully. Format your responses in markdown.`
         : 'You are a helpful research assistant. Format your responses in markdown.',
     };
+
+    console.log('[Chat API] System message length:', systemMessage.content.length);
 
     // Call OpenAI with conversation history
     const completion = await openai.chat.completions.create({
