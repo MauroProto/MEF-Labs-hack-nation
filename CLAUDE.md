@@ -65,6 +65,8 @@ When asking Claude for help, always include relevant files from this list:
    - Database schema
    - Agent communication architecture
 
+DEBATE_SYSTEM_SUMMARY.md has the overview of the architecture and rational for the core functionality of the debate between the agents.
+
    **When to reference**: Starting any new feature, understanding overall architecture
 
 2. **[HACKATHON_PAPER_CANVAS_BLUEPRINT.md](./HACKATHON_PAPER_CANVAS_BLUEPRINT.md)** (32k+ tokens)
