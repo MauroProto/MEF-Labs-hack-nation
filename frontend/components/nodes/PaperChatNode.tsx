@@ -30,10 +30,12 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
   const [messages, setMessages] = useState<Message[]>(data.messages || []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedPaperId, setSelectedPaperId] = useState<string | null>(data.paperId || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const getPaperForNode = usePaperContextStore(state => state.getPaperForNode);
+  const { getPaperForNode, getAllPapers } = usePaperContextStore();
   const connectedPaper = getPaperForNode(id);
+  const papersList = getAllPapers();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

@@ -10,7 +10,7 @@
  */
 
 import { LRUCache } from 'lru-cache';
-import { agentBus } from './agentEventBus';
+import { agentBus, AgentEventBus } from './agentEventBus';
 import { AgentRateLimiters } from '../lib/rateLimiter';
 import {
   AgentInvocationRequest,
@@ -60,7 +60,7 @@ export class AgentOrchestrator {
    * This is the main entry point for agent-to-agent communication
    */
   public async invoke(params: AgentInvocationParams): Promise<AgentInvocationResult> {
-    const requestId = agentBus.constructor.generateRequestId();
+    const requestId = AgentEventBus.generateRequestId();
     const timeout = params.timeout || this.defaultTimeout;
 
     // Create invocation context
@@ -69,6 +69,7 @@ export class AgentOrchestrator {
       callStack: new Set([params.from]),
       startTime: new Date(),
       timeout,
+      conversationTurns: new Map<string, number>(), // Track bidirectional conversations
     };
 
     // Store active invocation

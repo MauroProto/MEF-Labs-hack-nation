@@ -30,7 +30,7 @@ const UpdatePaperSchema = z.object({
 /**
  * Get all papers for a canvas
  */
-export async function getPapersByCanvas(req: Request, res: Response) {
+export async function getPapersByCanvas(req: Request, res: Response): Promise<void> {
   try {
     const { canvasId } = req.params;
 
@@ -56,7 +56,7 @@ export async function getPapersByCanvas(req: Request, res: Response) {
 /**
  * Get a single paper by ID
  */
-export async function getPaperById(req: Request, res: Response) {
+export async function getPaperById(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
 
@@ -95,7 +95,7 @@ export async function getPaperById(req: Request, res: Response) {
 /**
  * Upload/Create a new paper
  */
-export async function createPaper(req: Request, res: Response) {
+export async function createPaper(req: Request, res: Response): Promise<void> {
   try {
     const validated = CreatePaperSchema.parse(req.body);
 
@@ -147,7 +147,7 @@ export async function createPaper(req: Request, res: Response) {
 /**
  * Update a paper
  */
-export async function updatePaper(req: Request, res: Response) {
+export async function updatePaper(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
     const validated = UpdatePaperSchema.parse(req.body);
@@ -193,7 +193,7 @@ export async function updatePaper(req: Request, res: Response) {
 /**
  * Delete a paper
  */
-export async function deletePaper(req: Request, res: Response) {
+export async function deletePaper(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
 

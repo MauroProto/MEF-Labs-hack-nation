@@ -25,7 +25,7 @@ const UpdateCanvasSchema = z.object({
 /**
  * Get all canvases (with optional filtering by userId)
  */
-export async function getAllCanvases(req: Request, res: Response) {
+export async function getAllCanvases(req: Request, res: Response): Promise<void> {
   try {
     const { userId } = req.query;
 
@@ -65,7 +65,7 @@ export async function getAllCanvases(req: Request, res: Response) {
 /**
  * Get a single canvas by ID
  */
-export async function getCanvasById(req: Request, res: Response) {
+export async function getCanvasById(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
 
@@ -113,7 +113,7 @@ export async function getCanvasById(req: Request, res: Response) {
 /**
  * Create a new canvas
  */
-export async function createCanvas(req: Request, res: Response) {
+export async function createCanvas(req: Request, res: Response): Promise<void> {
   try {
     const validated = CreateCanvasSchema.parse(req.body);
 
@@ -159,7 +159,7 @@ export async function createCanvas(req: Request, res: Response) {
 /**
  * Update a canvas
  */
-export async function updateCanvas(req: Request, res: Response) {
+export async function updateCanvas(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
     const validated = UpdateCanvasSchema.parse(req.body);
@@ -214,7 +214,7 @@ export async function updateCanvas(req: Request, res: Response) {
 /**
  * Delete a canvas
  */
-export async function deleteCanvas(req: Request, res: Response) {
+export async function deleteCanvas(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
 
