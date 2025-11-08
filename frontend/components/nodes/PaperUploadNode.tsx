@@ -68,6 +68,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
           const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
           const pdf = await loadingTask.promise;
           const maxPages = Math.min(pdf.numPages, 12); // Limitar para rendimiento
+          console.log('[PaperUploadNode] PDF loaded. Total pages:', pdf);
           for (let p = 1; p <= maxPages; p++) {
             const page = await pdf.getPage(p);
             const content = await page.getTextContent();

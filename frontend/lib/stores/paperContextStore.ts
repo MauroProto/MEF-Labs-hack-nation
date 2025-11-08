@@ -75,6 +75,7 @@ export const usePaperContextStore = create<PaperContextState>()((set, get) => ({
     set((state) => {
       const newPapers = new Map(state.papers);
       newPapers.set(paper.id, paper);
+      console.log('[PaperContextStore] Added paper:', paper.fullText.length);
       return { papers: newPapers };
     }),
 

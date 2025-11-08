@@ -11,6 +11,9 @@
     "type-check": "tsc --noEmit",
     "clean": "rimraf .next"
   },
+  "resolutions": {
+    "pdfjs-dist": "4.10.38"
+  },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
