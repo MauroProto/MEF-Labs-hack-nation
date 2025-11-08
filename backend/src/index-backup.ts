@@ -7,8 +7,6 @@ import { createServer } from 'http';
 // Routes
 import agentRoutes from './routes/agentRoutes';
 import capabilityRoutes from './routes/capabilityRoutes';
-import canvasRoutes from './routes/canvasRoutes';
-import paperRoutes from './routes/paperRoutes';
 
 // WebSocket
 import { initializeWebSocket, getWebSocketManager } from './lib/websocket';
@@ -31,7 +29,7 @@ const wsManager = initializeWebSocket(httpServer);
 // Middleware
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     credentials: true,
   })
 );
@@ -61,8 +59,6 @@ app.get('/api', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      canvas: '/api/canvas',
-      papers: '/api/papers',
       agents: '/api/agents',
       capabilities: '/api/capabilities',
     },
@@ -70,8 +66,6 @@ app.get('/api', (req, res) => {
 });
 
 // Mount routes
-app.use('/api/canvas', canvasRoutes);
-app.use('/api/papers', paperRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/capabilities', capabilityRoutes);
 
@@ -121,7 +115,6 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🎨 Canvas API: http://localhost:${PORT}/api/canvas`);
   console.log(`🤖 Agents API: http://localhost:${PORT}/api/agents`);
   console.log(`🔌 WebSocket server initialized on port ${PORT}`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);

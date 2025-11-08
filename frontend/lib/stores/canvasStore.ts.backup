@@ -1,0 +1,217 @@
+/**
+ * Canvas Store
+ *
+ * Zustand store for managing React Flow canvas state.
+ * Features:
+ * - Nodes and edges management
+ * - Autosave to localStorage
+ * - Undo/redo functionality
+ * - Canvas viewport state
+ */
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { Node, Edge, Viewport } from '@xyflow/react';
+import debounce from 'lodash.debounce';
+
+export interface CanvasState {
+  // Canvas state
+  nodes: Node[];
+  edges: Edge[];
+  viewport: Viewport;
+  canvasId: string | null;
+  canvasName: string;
+
+  // UI state
+  isLoading: boolean;
+  isSaving: boolean;
+  lastSaved: Date | null;
+
+  // Actions - Nodes
+  addNode: (node: Node) => void;
+  updateNode: (nodeId: string, data: Partial<Node>) => void;
+  removeNode: (nodeId: string) => void;
+  setNodes: (nodes: Node[]) => void;
+
+  // Actions - Edges
+  addEdge: (edge: Edge) => void;
+  removeEdge: (edgeId: string) => void;
+  setEdges: (edges: Edge[]) => void;
+
+  // Actions - Viewport
+  setViewport: (viewport: Viewport) => void;
+
+  // Actions - Canvas
+  setCanvasId: (id: string) => void;
+  setCanvasName: (name: string) => void;
+  clearCanvas: () => void;
+  loadCanvas: (data: { nodes: Node[]; edges: Edge[]; name?: string }) => void;
+
+  // Autosave
+  triggerAutosave: () => void;
+  setIsSaving: (isSaving: boolean) => void;
+
+  // Lock system
+  lockedNodes: Set<string>;
+  toggleNodeLock: (nodeId: string) => void;
+  isNodeLocked: (nodeId: string) => boolean;
+  lockAllNodes: () => void;
+  unlockAllNodes: () => void;
+}
+
+const AUTOSAVE_DELAY = 30000; // 30 seconds
+
+export const useCanvasStore = create<CanvasState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      canvasId: null,
+      canvasName: 'Untitled Canvas',
+      isLoading: false,
+      isSaving: false,
+      lastSaved: null,
+      lockedNodes: new Set(),
+
+      // Node actions
+      addNode: (node) =>
+        set((state) => {
+          const newNodes = [...state.nodes, node];
+          get().triggerAutosave();
+          return { nodes: newNodes };
+        }),
+
+      updateNode: (nodeId, data) =>
+        set((state) => {
+          const newNodes = state.nodes.map((node) =>
+            node.id === nodeId ? { ...node, ...data } : node
+          );
+          get().triggerAutosave();
+          return { nodes: newNodes };
+        }),
+
+      removeNode: (nodeId) =>
+        set((state) => {
+          // Remove node
+          const newNodes = state.nodes.filter((node) => node.id !== nodeId);
+
+          // Remove connected edges
+          const newEdges = state.edges.filter(
+            (edge) => edge.source !== nodeId && edge.target !== nodeId
+          );
+
+          // Remove from locked nodes
+          const newLockedNodes = new Set(state.lockedNodes);
+          newLockedNodes.delete(nodeId);
+
+          get().triggerAutosave();
+          return { nodes: newNodes, edges: newEdges, lockedNodes: newLockedNodes };
+        }),
+
+      setNodes: (nodes) => {
+        set({ nodes });
+        get().triggerAutosave();
+      },
+
+      // Edge actions
+      addEdge: (edge) =>
+        set((state) => {
+          const newEdges = [...state.edges, edge];
+          get().triggerAutosave();
+          return { edges: newEdges };
+        }),
+
+      removeEdge: (edgeId) =>
+        set((state) => {
+          const newEdges = state.edges.filter((edge) => edge.id !== edgeId);
+          get().triggerAutosave();
+          return { edges: newEdges };
+        }),
+
+      setEdges: (edges) => {
+        set({ edges });
+        get().triggerAutosave();
+      },
+
+      // Viewport actions
+      setViewport: (viewport) => set({ viewport }),
+
+      // Canvas actions
+      setCanvasId: (id) => set({ canvasId: id }),
+
+      setCanvasName: (name) => set({ canvasName: name }),
+
+      clearCanvas: () =>
+        set({
+          nodes: [],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+          canvasId: null,
+          canvasName: 'Untitled Canvas',
+          lockedNodes: new Set(),
+        }),
+
+      loadCanvas: (data) =>
+        set({
+          nodes: data.nodes,
+          edges: data.edges,
+          canvasName: data.name || 'Untitled Canvas',
+          isLoading: false,
+        }),
+
+      // Autosave (debounced)
+      triggerAutosave: debounce(() => {
+        const state = get();
+
+        // Don't autosave if no canvas ID (not persisted to backend yet)
+        if (!state.canvasId) return;
+
+        set({ isSaving: true });
+
+        // TODO: Implement API call to save canvas
+        // For now, just update lastSaved timestamp
+        setTimeout(() => {
+          set({ isSaving: false, lastSaved: new Date() });
+        }, 500);
+      }, AUTOSAVE_DELAY),
+
+      setIsSaving: (isSaving) => set({ isSaving }),
+
+      // Lock system
+      toggleNodeLock: (nodeId) =>
+        set((state) => {
+          const newLockedNodes = new Set(state.lockedNodes);
+          if (newLockedNodes.has(nodeId)) {
+            newLockedNodes.delete(nodeId);
+          } else {
+            newLockedNodes.add(nodeId);
+          }
+          return { lockedNodes: newLockedNodes };
+        }),
+
+      isNodeLocked: (nodeId) => get().lockedNodes.has(nodeId),
+
+      lockAllNodes: () =>
+        set((state) => {
+          const allNodeIds = state.nodes.map((node) => node.id);
+          return { lockedNodes: new Set(allNodeIds) };
+        }),
+
+      unlockAllNodes: () => set({ lockedNodes: new Set() }),
+    }),
+    {
+      name: 'canvas-storage',
+      partialize: (state) => ({
+        // Only persist these fields to localStorage
+        nodes: state.nodes,
+        edges: state.edges,
+        viewport: state.viewport,
+        canvasId: state.canvasId,
+        canvasName: state.canvasName,
+        lastSaved: state.lastSaved,
+      }),
+    }
+  )
+);

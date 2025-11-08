@@ -1,14 +1,29 @@
+'use client';
+
+import React from 'react';
+import dynamic from 'next/dynamic';
+import { ReactFlowProvider } from '@/components/providers/ReactFlowProvider';
+
+const EnhancedCanvas = dynamic(
+  () => import('@/components/canvas/EnhancedCanvas').then((mod) => ({ default: mod.EnhancedCanvas })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading Research Agent Canvas...</p>
+          <p className="text-gray-400 text-sm mt-2">Phase 5: Essential Nodes</p>
+        </div>
+      </div>
+    ),
+  }
+);
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
-        <h1 className="text-4xl font-bold text-center mb-4">
-          Research Agent Canvas
-        </h1>
-        <p className="text-center text-gray-600 dark:text-gray-400">
-          Visual multi-agent AI system for collaborative scientific paper analysis
-        </p>
-      </div>
-    </main>
+    <ReactFlowProvider>
+      <EnhancedCanvas />
+    </ReactFlowProvider>
   );
 }

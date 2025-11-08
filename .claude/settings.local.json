@@ -2,7 +2,21 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Bash(pnpm install:*)"
+      "Bash(pnpm install:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp list:*)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(pnpm type-check:*)",
+      "Bash(pnpm dev)",
+      "Bash(docker-compose up:*)",
+      "Bash(cd /Users/mauro/Desktop/proyectos/MEF-Labs-hack-nation/backend && pnpm prisma generate:*)",
+      "Bash(pnpm prisma migrate dev:*)",
+      "Bash(cat:*)",
+      "Bash(CANVAS_ID=\"cmhqr4pey0001f5tv1owavi2l\")",
+      "Bash(pnpm remove:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []
