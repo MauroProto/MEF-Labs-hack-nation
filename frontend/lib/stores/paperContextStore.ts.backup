@@ -1,0 +1,241 @@
+/**
+ * Paper Context Store
+ *
+ * Zustand store for managing uploaded papers and their connections to nodes.
+ * Features:
+ * - Paper upload and storage
+ * - Paper-to-node connections
+ * - Paper metadata management
+ * - Context sharing between nodes
+ */
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+export interface PaperAuthor {
+  name: string;
+  affiliation?: string;
+}
+
+export interface PaperCitation {
+  id: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  doi?: string;
+  url?: string;
+}
+
+export interface Paper {
+  id: string;
+  canvasId: string;
+  title: string;
+  authors: PaperAuthor[];
+  abstract: string | null;
+  fullText: string;
+  citations: PaperCitation[];
+  metadata: {
+    doi?: string;
+    year?: number;
+    journal?: string;
+    keywords?: string[];
+    pageCount?: number;
+    uploadedAt: Date;
+  };
+}
+
+export interface PaperContextState {
+  // Papers
+  papers: Map<string, Paper>; // paperId -> paper
+
+  // Connections: which nodes are connected to which papers
+  paperConnections: Map<string, string>; // nodeId -> paperId
+
+  // Selected paper for viewing
+  selectedPaper: Paper | null;
+
+  // Upload state
+  isUploading: boolean;
+  uploadProgress: number;
+
+  // Actions - Papers
+  addPaper: (paper: Paper) => void;
+  removePaper: (paperId: string) => void;
+  getPaper: (paperId: string) => Paper | undefined;
+  getAllPapers: () => Paper[];
+  updatePaper: (paperId: string, updates: Partial<Paper>) => void;
+
+  // Actions - Connections
+  connectNodeToPaper: (nodeId: string, paperId: string) => void;
+  disconnectNode: (nodeId: string) => void;
+  getPaperForNode: (nodeId: string) => Paper | undefined;
+  getNodesForPaper: (paperId: string) => string[];
+
+  // Actions - Selection
+  selectPaper: (paper: Paper | null) => void;
+
+  // Actions - Upload
+  setUploading: (isUploading: boolean) => void;
+  setUploadProgress: (progress: number) => void;
+
+  // Actions - Context
+  getContextForNode: (nodeId: string) => {
+    paper: Paper | undefined;
+    connectedPapers: Paper[];
+  };
+
+  // Actions - Utilities
+  clearAll: () => void;
+}
+
+export const usePaperContextStore = create<PaperContextState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      papers: new Map(),
+      paperConnections: new Map(),
+      selectedPaper: null,
+      isUploading: false,
+      uploadProgress: 0,
+
+      // Paper actions
+      addPaper: (paper) =>
+        set((state) => {
+          const newPapers = new Map(state.papers);
+          newPapers.set(paper.id, paper);
+          return { papers: newPapers };
+        }),
+
+      removePaper: (paperId) =>
+        set((state) => {
+          const newPapers = new Map(state.papers);
+          const newConnections = new Map(state.paperConnections);
+
+          newPapers.delete(paperId);
+
+          // Remove all connections to this paper
+          for (const [nodeId, connectedPaperId] of newConnections) {
+            if (connectedPaperId === paperId) {
+              newConnections.delete(nodeId);
+            }
+          }
+
+          return {
+            papers: newPapers,
+            paperConnections: newConnections,
+            selectedPaper:
+              state.selectedPaper?.id === paperId ? null : state.selectedPaper,
+          };
+        }),
+
+      getPaper: (paperId) => get().papers.get(paperId),
+
+      getAllPapers: () => Array.from(get().papers.values()),
+
+      updatePaper: (paperId, updates) =>
+        set((state) => {
+          const paper = state.papers.get(paperId);
+          if (!paper) return state;
+
+          const newPapers = new Map(state.papers);
+          newPapers.set(paperId, { ...paper, ...updates });
+
+          return { papers: newPapers };
+        }),
+
+      // Connection actions
+      connectNodeToPaper: (nodeId, paperId) =>
+        set((state) => {
+          const newConnections = new Map(state.paperConnections);
+          newConnections.set(nodeId, paperId);
+          return { paperConnections: newConnections };
+        }),
+
+      disconnectNode: (nodeId) =>
+        set((state) => {
+          const newConnections = new Map(state.paperConnections);
+          newConnections.delete(nodeId);
+          return { paperConnections: newConnections };
+        }),
+
+      getPaperForNode: (nodeId) => {
+        const paperId = get().paperConnections.get(nodeId);
+        return paperId ? get().papers.get(paperId) : undefined;
+      },
+
+      getNodesForPaper: (paperId) => {
+        const connections = get().paperConnections;
+        const nodeIds: string[] = [];
+
+        for (const [nodeId, connectedPaperId] of connections) {
+          if (connectedPaperId === paperId) {
+            nodeIds.push(nodeId);
+          }
+        }
+
+        return nodeIds;
+      },
+
+      // Selection actions
+      selectPaper: (paper) => set({ selectedPaper: paper }),
+
+      // Upload actions
+      setUploading: (isUploading) => set({ isUploading }),
+
+      setUploadProgress: (progress) => set({ uploadProgress: progress }),
+
+      // Context actions
+      getContextForNode: (nodeId) => {
+        const state = get();
+        const directPaper = state.getPaperForNode(nodeId);
+
+        // Get all papers (for now, return all - can be filtered later)
+        const allPapers = state.getAllPapers();
+
+        return {
+          paper: directPaper,
+          connectedPapers: directPaper ? [directPaper] : allPapers,
+        };
+      },
+
+      // Utility actions
+      clearAll: () =>
+        set({
+          papers: new Map(),
+          paperConnections: new Map(),
+          selectedPaper: null,
+          isUploading: false,
+          uploadProgress: 0,
+        }),
+    }),
+    {
+      name: 'paper-context-storage',
+      partialize: (state) => ({
+        // Only persist these fields to localStorage
+        papers: Array.from(state.papers.entries()),
+        paperConnections: Array.from(state.paperConnections.entries()),
+      }),
+      // Custom serialization for Maps
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+
+          const data = JSON.parse(str);
+          return {
+            state: {
+              ...data.state,
+              papers: new Map(data.state.papers),
+              paperConnections: new Map(data.state.paperConnections),
+            },
+          };
+        },
+        setItem: (name, value) => {
+          const serialized = JSON.stringify(value);
+          localStorage.setItem(name, serialized);
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
+    }
+  )
+);
