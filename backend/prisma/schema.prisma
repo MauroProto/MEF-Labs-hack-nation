@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User Model
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  canvases  Canvas[]
+
+  @@index([email])
+}
+
+// Canvas Model - Stores research canvas state
+model Canvas {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String
+  nodes     Json     // React Flow nodes array
+  edges     Json     // React Flow edges array
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  papers    Paper[]
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+// Paper Model - Stores uploaded research papers
+model Paper {
+  id        String   @id @default(cuid())
+  canvasId  String
+  canvas    Canvas   @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  title     String
+  authors   Json     // Array of author names
+  abstract  String?  @db.Text
+  fullText  String   @db.Text
+  citations Json?    // Array of citation objects
+  metadata  Json?    // Additional metadata (DOI, year, etc.)
+  createdAt DateTime @default(now())
+
+  @@index([canvasId])
+  @@index([title])
+}
+
+// Agent Model - Registry of available agents and their capabilities
+model Agent {
+  id              String            @id @default(cuid())
+  nodeId          String            @unique // React Flow node ID
+  agentType       String            // "researcher", "critic", "synthesizer", etc.
+  name            String
+  description     String            @db.Text
+  systemPrompt    String            @db.Text
+  capabilities    Json              // Array of tool schemas this agent exposes
+  status          String            @default("idle") // "idle", "working", "error"
+  version         String            @default("1.0.0")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  messages        AgentMessage[]
+  invocations     AgentInvocation[] @relation("invoker")
+  receivedCalls   AgentInvocation[] @relation("target")
+
+  @@index([nodeId])
+  @@index([agentType])
+  @@index([status])
+}
+
+// AgentMessage Model - Stores agent communications
+model AgentMessage {
+  id          String   @id @default(cuid())
+  fromAgentId String
+  fromAgent   Agent    @relation(fields: [fromAgentId], references: [id], onDelete: Cascade)
+  toAgentId   String? // Null for broadcast messages
+  messageType String // "analysis", "question", "critique", "response", "tool_call"
+  content     Json // Structured message content
+  reasoning   Json? // Array of reasoning steps
+  sources     Json? // Array of source citations
+  confidence  Float    @default(0.5)
+  status      String   @default("published") // "draft", "published", "validated", "disputed"
+  parentId    String? // For threaded conversations
+  createdAt   DateTime @default(now())
+
+  @@index([fromAgentId])
+  @@index([toAgentId])
+  @@index([messageType])
+  @@index([createdAt])
+}
+
+// AgentInvocation Model - Tracks agent-to-agent tool calls
+model AgentInvocation {
+  id             String    @id @default(cuid())
+  invokerAgentId String
+  invokerAgent   Agent     @relation("invoker", fields: [invokerAgentId], references: [id], onDelete: Cascade)
+  targetAgentId  String
+  targetAgent    Agent     @relation("target", fields: [targetAgentId], references: [id], onDelete: Cascade)
+  toolName       String // The specific tool/capability being called
+  parameters     Json // Input parameters for the tool
+  result         Json? // Tool execution result
+  status         String    @default("pending") // "pending", "running", "completed", "failed"
+  error          String?   @db.Text
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  duration       Int? // Milliseconds
+
+  @@index([invokerAgentId])
+  @@index([targetAgentId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// AgentCapability Model - Normalized tool schemas
+model AgentCapability {
+  id           String @id @default(cuid())
+  agentType    String // Which type of agent provides this
+  toolName     String // Unique tool identifier
+  description  String @db.Text
+  inputSchema  Json // JSON Schema for parameters
+  outputSchema Json // JSON Schema for response
+  examples     Json? // Example usage
+  category     String // "analysis", "search", "validation", etc.
+  version      String @default("1.0.0")
+
+  @@unique([agentType, toolName])
+  @@index([category])
+}
+
+// WebSearchResult Model - Cache for web searches
+model WebSearchResult {
+  id        String   @id @default(cuid())
+  query     String   @db.Text
+  queryHash String   @unique // Hash of query for deduplication
+  results   Json // Array of search results
+  source    String // "tavily", "google_scholar", etc.
+  createdAt DateTime @default(now())
+  expiresAt DateTime // TTL for cache invalidation
+
+  @@index([queryHash])
+  @@index([expiresAt])
+}
