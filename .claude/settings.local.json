@@ -16,7 +16,11 @@
       "Bash(CANVAS_ID=\"cmhqr4pey0001f5tv1owavi2l\")",
       "Bash(pnpm remove:*)",
       "Bash(pnpm build:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

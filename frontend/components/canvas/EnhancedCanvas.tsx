@@ -90,7 +90,7 @@ export function EnhancedCanvas() {
         type: nodeType,
         position,
         data: {
-          label: config.label,
+          label: String(config.label), // Ensure it's a string
           type: nodeType as any,
           config,
         },
@@ -114,7 +114,10 @@ export function EnhancedCanvas() {
   // Add node on button click
   const addNode = useCallback((nodeType: string) => {
     const config = NODE_CONFIGS[nodeType as keyof typeof NODE_CONFIGS];
-    if (!config) return;
+    if (!config) {
+      console.error(`Config not found for node type: ${nodeType}`);
+      return;
+    }
 
     // Calculate center position
     const centerX = window.innerWidth / 2 - 150;
@@ -125,7 +128,7 @@ export function EnhancedCanvas() {
       type: nodeType,
       position: { x: centerX, y: centerY },
       data: {
-        label: config.label,
+        label: String(config.label), // Ensure it's a string
         type: nodeType as any,
         config,
       },

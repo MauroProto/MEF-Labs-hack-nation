@@ -116,7 +116,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
 
       {/* Content */}
       <div
-        className="p-2.5 overflow-auto text-xs text-gray-700"
+        className="text-xs text-gray-700 overflow-hidden"
         style={{
           height: 'calc(100% - 36px)',
           minHeight: `calc(${config.defaultHeight}px - 36px)`
