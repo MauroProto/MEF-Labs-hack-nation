@@ -76,10 +76,13 @@ export class AgentOrchestrator {
     this.activeInvocations.set(requestId, context);
 
     try {
-      // 1. Check for circular dependencies
+      // 1. Check conversation turns (circular dependency prevention for debates)
+      this.checkConversationTurns(params.from, params.to, context);
+
+      // 2. Check for circular dependencies
       this.checkCircularDependency(params.from, params.to, context);
 
-      // 2. Check call depth
+      // 3. Check call depth
       if (context.callStack.size > this.maxCallDepth) {
         throw new AgentError(
           ErrorCode.CircularDependency,
@@ -88,7 +91,7 @@ export class AgentOrchestrator {
         );
       }
 
-      // 3. Check rate limits
+      // 4. Check rate limits
       const canvasId = params.context?.canvasId || 'default';
       const rateLimitCheck = AgentRateLimiters.checkInvocation(params.to, canvasId);
 
@@ -213,6 +216,44 @@ export class AgentOrchestrator {
    */
   public clearCache(): void {
     this.resultCache.clear();
+  }
+
+  /**
+   * Check conversation turns to prevent infinite loops
+   */
+  private checkConversationTurns(from: string, to: string, context: InvocationContext): void {
+    // Create bidirectional conversation key (sorted to ensure consistency)
+    const convKey = [from, to].sort().join('→');
+    const turns = context.conversationTurns.get(convKey) || 0;
+    const maxTurns = this.getMaxTurns(from, to);
+
+    if (turns >= maxTurns) {
+      throw new AgentError(
+        ErrorCode.CircularDependency,
+        `Max conversation turns (${maxTurns}) exceeded for ${convKey}`,
+        { from, to, turns, maxTurns }
+      );
+    }
+
+    // Increment turn count
+    context.conversationTurns.set(convKey, turns + 1);
+  }
+
+  /**
+   * Get maximum allowed conversation turns for agent pair
+   */
+  private getMaxTurns(from: string, to: string): number {
+    // Debater ↔ Researcher: 1 turn (request → response, no back-and-forth)
+    const isDebaterResearcher =
+      (from.includes('debater') && to.includes('researcher')) ||
+      (from.includes('researcher') && to.includes('debater'));
+
+    if (isDebaterResearcher) {
+      return 1;
+    }
+
+    // Other agent pairs: 3 turns allowed
+    return 3;
   }
 
   /**
