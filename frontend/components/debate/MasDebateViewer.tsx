@@ -105,11 +105,11 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
                     </div>
 
                     {/* Evidence */}
-                    {(topicArg.cites.paper?.length || topicArg.cites.web?.length) && (
+                    {(topicArg.citations.paper?.length || topicArg.citations.web?.length) && (
                       <div className="mb-3">
                         <h4 className="text-sm font-semibold text-gray-700 mb-2">Evidence</h4>
                         <div className="space-y-2">
-                          {topicArg.cites.paper?.slice(0, 2).map((cite, i) => (
+                          {topicArg.citations.paper?.slice(0, 2).map((cite, i) => (
                             <div
                               key={i}
                               className="text-xs bg-white/50 p-2 rounded border border-gray-200"
@@ -128,7 +128,7 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
                               </p>
                             </div>
                           ))}
-                          {topicArg.cites.web?.slice(0, 2).map((cite, i) => (
+                          {topicArg.citations.web?.slice(0, 2).map((cite, i) => (
                             <a
                               key={i}
                               href={cite.url}

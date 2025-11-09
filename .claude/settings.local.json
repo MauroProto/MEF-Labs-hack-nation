@@ -29,7 +29,10 @@
       "Bash(kill:*)",
       "Bash(npx kill-port:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

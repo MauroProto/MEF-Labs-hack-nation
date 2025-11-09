@@ -3,7 +3,6 @@ import { PostureGenerator } from "./PostureGenerator";
 import { DebaterAgent } from "./DebaterAgent";
 import { JudgeAgent } from "./JudgeAgent";
 import { ReporterAgent } from "./ReporterAgent";
-import { FactCheckerAgent, FactCheckSummary } from "./FactCheckerAgent";
 import {
   Paper,
   DebateSession,
@@ -23,7 +22,6 @@ export class DebateCoordinator {
   private postureGenerator: PostureGenerator;
   private judgeAgent: JudgeAgent;
   private reporterAgent: ReporterAgent;
-  private factCheckerAgent: FactCheckerAgent;
   private rubric: Rubric;
 
   constructor(config: DebateCoordinatorConfig = {}) {
@@ -31,7 +29,6 @@ export class DebateCoordinator {
     this.postureGenerator = new PostureGenerator();
     this.judgeAgent = new JudgeAgent();
     this.reporterAgent = new ReporterAgent();
-    this.factCheckerAgent = new FactCheckerAgent();
     this.rubric = config.rubric || DEFAULT_RUBRIC;
   }
 
@@ -118,34 +115,18 @@ export class DebateCoordinator {
   }
 
   /**
-   * Step 4: Fact-check the arguments
-   */
-  async factCheckArguments(
-    paper: Paper,
-    debaterArguments: DebaterArgument[]
-  ): Promise<FactCheckSummary> {
-    const factCheck = await this.factCheckerAgent.checkFacts({
-      paper,
-      arguments: debaterArguments,
-    });
-    return factCheck;
-  }
-
-  /**
-   * Step 5: Judge the debate (with fact-check results)
+   * Step 4: Judge the debate
    */
   async judgeDebate(
     question: string,
     topics: string[],
-    debaterArguments: DebaterArgument[],
-    factCheck?: FactCheckSummary
+    debaterArguments: DebaterArgument[]
   ): Promise<JudgeVerdict> {
     const verdict = await this.judgeAgent.judge({
       question,
       topics,
       arguments: debaterArguments,
       rubric: this.rubric,
-      factCheck,
     });
     return verdict;
   }
@@ -194,17 +175,12 @@ export class DebateCoordinator {
       const debaterArguments = await this.runDebate(paper, question, topics, postures, onProgress);
       onProgress?.("debate_complete", { arguments: debaterArguments });
 
-      // Step 3: Fact-check arguments
-      onProgress?.("Fact-checking arguments...");
-      const factCheck = await this.factCheckArguments(paper, debaterArguments);
-      onProgress?.("factcheck_complete", { factCheck });
-
-      // Step 4: Judge debate (with fact-check results)
+      // Step 3: Judge debate
       onProgress?.("Judging arguments...");
-      const verdict = await this.judgeDebate(question, topics, debaterArguments, factCheck);
+      const verdict = await this.judgeDebate(question, topics, debaterArguments);
       onProgress?.("judging_complete", { verdict });
 
-      // Step 5: Generate report
+      // Step 4: Generate report
       onProgress?.("Generating final report...");
       const report = await this.generateReport(
         question,
