@@ -16,7 +16,7 @@ export abstract class BaseDebateAgent {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    this.model = config.model || "gpt-4o-mini-2024-07-18";
+    this.model = config.model || "gpt-5-2025-08-07";
     this.maxTokens = config.maxTokens || 4096;
     this.temperature = config.temperature || 0.7;
   }
@@ -46,16 +46,7 @@ export abstract class BaseDebateAgent {
     };
 
     if (tools && tools.length > 0) {
-      params.tools = [
-        ...tools,
-        {
-          type: "web_search" as any,
-          web_search: {
-            location: "US",
-            search_context_size: "medium",
-          } as any,
-        },
-      ] as any;
+      params.tools = tools;
       params.tool_choice = "auto";
     }
 
