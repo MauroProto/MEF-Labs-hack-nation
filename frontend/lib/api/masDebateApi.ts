@@ -91,6 +91,42 @@ export type DebateReport = {
   markdown: string;
 };
 
+// Enhanced Debate Types
+export type DebateExchange = {
+  fromDebater: string;
+  toDebater: string;
+  question: string;
+  response: string;
+  timestamp: number;
+};
+
+export type DebateRound = {
+  roundNumber: number;
+  exchanges: DebateExchange[];
+};
+
+export type QuestionDebateResult = {
+  question: string;
+  postures: string[];
+  topics: string[];
+  initialArguments: DebaterArgument[];
+  rounds: DebateRound[];
+  verdict: JudgeVerdict;
+};
+
+export type EnhancedDebateReport = {
+  questions: string[];
+  debateResults: QuestionDebateResult[];
+  overallSummary: string;
+  consolidatedInsights: string[];
+  consolidatedControversialPoints: string[];
+  finalRanking: Array<{
+    posture: string;
+    averageScore: number;
+  }>;
+  markdown: string;
+};
+
 // ============================================================================
 // API Request/Response Types
 // ============================================================================
@@ -128,6 +164,13 @@ export type RunCompleteDebateRequest = {
   numPostures?: number;
 };
 
+export type RunEnhancedDebateRequest = {
+  paperId: string;
+  questions: string[];
+  numPostures?: number;
+  numRounds?: number;
+};
+
 // ============================================================================
 // SSE Progress Event Types
 // ============================================================================
@@ -136,17 +179,30 @@ export type DebateProgressEvent =
   | { stage: 'Generating postures and topics...'; data?: any }
   | { stage: 'postures_generated'; data: { postures: string[]; topics: string[] } }
   | { stage: 'Running debate with N debaters...'; data?: any }
+  | { stage: 'Running initial debate arguments...'; data?: any }
   | { stage: 'debater_started'; data: { debaterIndex: number; posture: string; total: number } }
   | { stage: 'debater_complete'; data: { debaterIndex: number; posture: string; argument: DebaterArgument; total: number } }
   | { stage: 'debater_error'; data: { debaterIndex: number; posture: string; error: string; total: number } }
   | { stage: 'debate_complete'; data: { arguments: DebaterArgument[] } }
+  | { stage: 'initial_arguments_complete'; data: { arguments: DebaterArgument[] } }
+  | { stage: 'Starting debate rounds...'; data?: any }
+  | { stage: 'round_started'; data: { roundNumber: number; totalRounds: number } }
+  | { stage: 'exchange_question'; data: { roundNumber: number; fromDebater: string; toDebater: string } }
+  | { stage: 'exchange_response'; data: { roundNumber: number; fromDebater: string; question: string } }
+  | { stage: 'round_complete'; data: { roundNumber: number; exchanges: DebateExchange[] } }
+  | { stage: 'rounds_complete'; data: { rounds: DebateRound[] } }
   | { stage: 'Judging arguments...'; data?: any }
+  | { stage: 'Judging full debate...'; data?: any }
   | { stage: 'judging_complete'; data: { verdict: JudgeVerdict } }
   | { stage: 'Generating final report...'; data?: any }
+  | { stage: 'Generating consolidated report...'; data?: any }
   | { stage: 'report_complete'; data: { report: DebateReport } }
+  | { stage: 'enhanced_report_complete'; data: { report: EnhancedDebateReport } }
   | { stage: 'Generating questions from paper...'; data?: any }
   | { stage: 'questions_generated'; data: { questions: string[] } }
-  | { stage: 'question_selected'; data: { question: string } };
+  | { stage: 'question_selected'; data: { question: string } }
+  | { stage: 'question_debate_started'; data: { questionIndex: number; totalQuestions: number; question: string } }
+  | { stage: 'question_debate_complete'; data: { questionIndex: number; result: QuestionDebateResult } };
 
 // ============================================================================
 // API Functions
@@ -316,6 +372,71 @@ export async function runCompleteDebateWithSSE(
             }
             if (data.report) {
               onComplete(data.report as DebateReport);
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    onError(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+/**
+ * Run enhanced debate with multiple questions and rounds with SSE
+ */
+export async function runEnhancedDebateWithSSE(
+  request: RunEnhancedDebateRequest,
+  onProgress: (event: DebateProgressEvent) => void,
+  onComplete: (report: EnhancedDebateReport) => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/mas-debate/run-enhanced`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          continue;
+        }
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.stage) {
+              onProgress(data as DebateProgressEvent);
+            }
+            // Enhanced report complete
+            if (data.questions && data.debateResults && data.finalRanking) {
+              onComplete(data as EnhancedDebateReport);
             }
           } catch (e) {
             console.error('Failed to parse SSE data:', e);

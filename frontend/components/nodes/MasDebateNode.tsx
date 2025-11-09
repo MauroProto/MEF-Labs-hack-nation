@@ -8,10 +8,11 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { BaseNode } from './BaseNode';
-import { MessageSquare, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { MessageSquare, Loader2, FileText, AlertCircle, Eye } from 'lucide-react';
 import { usePaperContextStore } from '@/lib/stores/paperContextStore';
 import { useMasDebate } from '@/lib/hooks/useMasDebate';
 import { MasDebateViewer } from '../debate/MasDebateViewer';
+import { DebateTranscriptViewer } from '../debate/DebateTranscriptViewer';
 import { Badge } from '../ui/badge';
 
 interface MasDebateNodeProps {
@@ -26,7 +27,7 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
   const [showTranscript, setShowTranscript] = useState(false);
 
   const { getPaperForNode } = usePaperContextStore();
-  const { debateState, loading, fetchQuestions, runDebate, runEnhancedDebate, loadDebateFromHistory, reset } = useMasDebate();
+  const { debateState, loading, fetchQuestions, runEnhancedDebate, loadDebateFromHistory, reset } = useMasDebate();
 
   const connectedPaper = getPaperForNode(id);
 
@@ -37,34 +38,108 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
     }
   }, [connectedPaper, debateState.status, debateState.questions, fetchQuestions]);
 
-  const handleSelectQuestion = useCallback(
-    async (index: number) => {
-      if (!connectedPaper || !debateState.questions) return;
-
-      setSelectedQuestionIndex(index);
-      const question = debateState.questions[index];
-
-      try {
-        await runDebate(connectedPaper.id, question, 3);
-      } catch (err) {
-        console.error('Failed to run debate:', err);
+  // Toggle question selection (checkboxes)
+  const toggleQuestionSelection = useCallback((index: number) => {
+    setSelectedQuestionIndices(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
       }
-    },
-    [connectedPaper, debateState.questions, runDebate]
-  );
+      return newSet;
+    });
+  }, []);
 
-  const handleCustomQuestion = useCallback(async () => {
-    if (!connectedPaper || !customQuestion.trim()) return;
+  // Start enhanced debate with selected questions
+  const handleStartEnhancedDebate = useCallback(async () => {
+    if (!connectedPaper || !debateState.questions || selectedQuestionIndices.size < 2) return;
+
+    const selectedQuestions = Array.from(selectedQuestionIndices)
+      .sort((a, b) => a - b)
+      .map(index => debateState.questions![index]);
 
     try {
-      await runDebate(connectedPaper.id, customQuestion, 3);
+      await runEnhancedDebate(connectedPaper.id, selectedQuestions, 3, 2);
     } catch (err) {
-      console.error('Failed to run debate:', err);
+      console.error('Failed to run enhanced debate:', err);
     }
-  }, [connectedPaper, customQuestion, runDebate]);
+  }, [connectedPaper, debateState.questions, selectedQuestionIndices, runEnhancedDebate]);
 
   const renderContent = () => {
-    // Show completed debate with history sidebar
+    // Show completed ENHANCED debate with transcript viewer
+    if (debateState.status === 'completed' && debateState.enhancedReport) {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="flex-shrink-0 p-3 border-b flex items-center justify-between gap-2">
+            <button
+              onClick={reset}
+              className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+            >
+              Run Another Debate
+            </button>
+            <button
+              onClick={() => setShowTranscript(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-sm"
+            >
+              <Eye className="h-4 w-4" />
+              View Full Transcript
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="mb-4">
+              <div className="text-sm font-semibold text-gray-700 mb-2">Debate Complete!</div>
+              <div className="text-xs text-gray-600">
+                {debateState.enhancedReport.questions.length} questions debated with {debateState.enhancedReport.debateResults[0]?.postures.length || 3} postures each
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <div className="text-xs font-semibold text-purple-900 mb-1">Winner:</div>
+                <div className="text-sm font-bold text-purple-700">
+                  {debateState.enhancedReport.finalRanking[0]?.posture}
+                </div>
+                <div className="text-xs text-purple-600 mt-1">
+                  Score: {(debateState.enhancedReport.finalRanking[0]?.averageScore * 100).toFixed(1)}%
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold text-gray-700 mb-2">Summary:</div>
+                <p className="text-xs text-gray-600">
+                  {debateState.enhancedReport.overallSummary}
+                </p>
+              </div>
+
+              {debateState.enhancedReport.consolidatedInsights.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-700 mb-2">Key Insights:</div>
+                  <ul className="space-y-1">
+                    {debateState.enhancedReport.consolidatedInsights.slice(0, 3).map((insight, i) => (
+                      <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                        <span className="text-purple-600">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {showTranscript && (
+            <DebateTranscriptViewer
+              report={debateState.enhancedReport}
+              onClose={() => setShowTranscript(false)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // Show completed single debate with history sidebar (old flow)
     if (debateState.status === 'completed' && debateState.report && debateState.arguments) {
       return (
         <div className="h-full flex">
@@ -218,6 +293,39 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
                 </div>
               </div>
             )}
+
+            {/* Show debate rounds in real-time */}
+            {debateState.currentRounds && debateState.currentRounds.length > 0 && (
+              <div className="w-full max-w-md bg-white border-2 border-purple-200 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <p className="text-sm font-semibold text-purple-700 mb-3">
+                  Debate Rounds ({debateState.currentRounds.length}):
+                </p>
+                <div className="space-y-3">
+                  {debateState.currentRounds.map((round) => (
+                    <div key={round.roundNumber} className="bg-purple-50 border border-purple-200 rounded p-3">
+                      <div className="text-xs font-semibold text-purple-900 mb-2">
+                        Round {round.roundNumber}
+                      </div>
+                      <div className="space-y-2">
+                        {round.exchanges.map((exchange, i) => (
+                          <div key={i} className="text-xs pl-2 border-l-2 border-purple-300">
+                            <div className="font-medium text-blue-700 mb-1">
+                              {exchange.fromDebater} → {exchange.toDebater}
+                            </div>
+                            <div className="text-gray-600 italic mb-1">
+                              Q: "{exchange.question.substring(0, 80)}{exchange.question.length > 80 ? '...' : ''}"
+                            </div>
+                            <div className="text-gray-800">
+                              A: {exchange.response.substring(0, 100)}{exchange.response.length > 100 ? '...' : ''}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -280,58 +388,71 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
 
         {debateState.questions && debateState.questions.length > 0 && (
           <div className="mb-4">
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">
-              Select a Question to Debate:
+            <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center justify-between">
+              <span>Select Questions to Debate (minimum 2):</span>
+              <span className="text-xs text-purple-600 font-medium">
+                {selectedQuestionIndices.size} selected
+              </span>
             </h4>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+
+            {selectedQuestionIndices.size > 0 && selectedQuestionIndices.size < 2 && (
+              <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                Please select at least 2 questions for a meaningful debate
+              </div>
+            )}
+
+            <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
               {debateState.questions.map((question, index) => (
-                <button
+                <label
                   key={index}
-                  onClick={() => handleSelectQuestion(index)}
-                  disabled={loading}
-                  className="w-full text-left p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`flex items-start gap-3 p-3 bg-white border-2 rounded-lg cursor-pointer transition-all ${
+                    selectedQuestionIndices.has(index)
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <p className="text-sm text-gray-900">{question}</p>
-                </button>
+                  <input
+                    type="checkbox"
+                    checked={selectedQuestionIndices.has(index)}
+                    onChange={() => toggleQuestionSelection(index)}
+                    disabled={loading}
+                    className="mt-1 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  />
+                  <p className="text-sm text-gray-900 flex-1">{question}</p>
+                </label>
               ))}
             </div>
-          </div>
-        )}
 
-        {/* Custom Question Input */}
-        {connectedPaper && (
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">
-              Or Enter Custom Question:
-            </h4>
-            <textarea
-              className="w-full h-24 p-2 text-sm border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="E.g., 'To what extent does this approach improve upon existing methods?'"
-              value={customQuestion}
-              onChange={(e) => setCustomQuestion(e.target.value)}
-              disabled={loading}
-            />
             <button
-              onClick={handleCustomQuestion}
-              disabled={loading || !customQuestion.trim()}
-              className="mt-2 w-full px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              onClick={handleStartEnhancedDebate}
+              disabled={loading || selectedQuestionIndices.size < 2}
+              className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-md disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
             >
-              Start Debate with Custom Question
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Running Enhanced Debate...
+                </span>
+              ) : (
+                `Start Enhanced Debate (${selectedQuestionIndices.size} questions, 2 rounds)`
+              )}
             </button>
           </div>
         )}
 
         {/* Info */}
-        <div className="mt-auto p-3 bg-gray-50 rounded-lg">
-          <h4 className="text-xs font-semibold text-gray-700 mb-1">
-            How the improved debate works:
+        <div className="mt-auto p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+          <h4 className="text-xs font-semibold text-purple-900 mb-2 flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" />
+            Enhanced Multi-Question Debate:
           </h4>
-          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
-            <li>Select or create a research question</li>
-            <li>3 AI debaters get different perspectives (postures)</li>
-            <li>ALL debaters argue the SAME topics from their perspectives</li>
-            <li>AI judge scores each debater per topic and overall</li>
-            <li>Comprehensive report with insights and recommendations</li>
+          <ol className="text-xs text-gray-700 space-y-1 list-decimal list-inside">
+            <li>Select <strong>multiple questions</strong> (minimum 2) for richer debate</li>
+            <li>For each question: 3 AI debaters get different postures</li>
+            <li>Initial arguments generated for all topics</li>
+            <li><strong>Debate rounds:</strong> Debaters question each other (like presidential debates!)</li>
+            <li>AI judge evaluates full debate + cross-examination</li>
+            <li>Consolidated report across all questions with transcript</li>
           </ol>
         </div>
       </div>
@@ -339,14 +460,7 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
   };
 
   return (
-    <BaseNode
-      id={id}
-      data={data}
-      selected={selected}
-      icon={MessageSquare}
-      title="Academic Debate (MAS)"
-      color="#8B5CF6"
-    >
+    <BaseNode id={id} data={data} selected={selected}>
       {renderContent()}
     </BaseNode>
   );

@@ -9,10 +9,14 @@ import {
   generateQuestions,
   generatePostures,
   runDebateWithSSE,
+  runEnhancedDebateWithSSE,
   type DebateProgressEvent,
   type DebateReport,
   type DebaterArgument,
   type JudgeVerdict,
+  type EnhancedDebateReport,
+  type DebateRound,
+  type QuestionDebateResult,
 } from '../api/masDebateApi';
 
 export type DebateStatus =
@@ -60,10 +64,15 @@ export type DebateState = {
   // Per-debater progress tracking
   debaterProgress: DebaterProgress[];
 
-  // Debate results (current debate)
+  // Debate results (current debate - single question)
   arguments?: DebaterArgument[];
   verdict?: JudgeVerdict;
   report?: DebateReport;
+
+  // Enhanced debate results (multiple questions + rounds)
+  enhancedReport?: EnhancedDebateReport;
+  currentRounds?: DebateRound[];  // Rounds being built in real-time
+  currentQuestionIndex?: number;  // Which question is being debated
 
   // Debate history (completed debates)
   history: DebateHistoryEntry[];
@@ -87,10 +96,11 @@ export function useMasDebate() {
   // ====================================================================
   const fetchQuestions = useCallback(async (paperId: string) => {
     setLoading(true);
-    setDebateState({
+    setDebateState((prev) => ({
+      ...prev,
       status: 'generating_questions',
       progress: 'Generating research questions from paper...',
-    });
+    }));
 
     try {
       const result = await generateQuestions({ paperId });
@@ -103,11 +113,12 @@ export function useMasDebate() {
       setLoading(false);
       return result.questions;
     } catch (error) {
-      setDebateState({
+      setDebateState((prev) => ({
+        ...prev,
         status: 'error',
         progress: '',
         error: error instanceof Error ? error.message : 'Failed to generate questions',
-      });
+      }));
       setLoading(false);
       throw error;
     }
@@ -157,11 +168,12 @@ export function useMasDebate() {
   const runDebate = useCallback(
     async (paperId: string, question: string, numPostures: number = 3) => {
       setLoading(true);
-      setDebateState({
+      setDebateState((prev) => ({
+        ...prev,
         status: 'generating_postures',
         progress: 'Starting debate...',
         selectedQuestion: question,
-      });
+      }));
 
       return new Promise<DebateReport>((resolve, reject) => {
         runDebateWithSSE(
@@ -307,11 +319,12 @@ export function useMasDebate() {
           },
           // On Error
           (error: Error) => {
-            setDebateState({
+            setDebateState((prev) => ({
+              ...prev,
               status: 'error',
               progress: '',
               error: error.message,
-            });
+            }));
             setLoading(false);
             reject(error);
           }
@@ -357,12 +370,179 @@ export function useMasDebate() {
     setLoading(false);
   }, []);
 
+  // ====================================================================
+  // Run Enhanced Debate (Multiple Questions + Rounds)
+  // ====================================================================
+  const runEnhancedDebate = useCallback(
+    async (
+      paperId: string,
+      questions: string[],
+      numPostures: number = 3,
+      numRounds: number = 2
+    ): Promise<EnhancedDebateReport> => {
+      setLoading(true);
+      setDebateState((prev) => ({
+        ...prev,
+        status: 'debating',
+        progress: `Starting enhanced debate with ${questions.length} questions...`,
+        debaterProgress: [],
+      }));
+
+      return new Promise<EnhancedDebateReport>((resolve, reject) => {
+        runEnhancedDebateWithSSE(
+          { paperId, questions, numPostures, numRounds },
+          // On Progress
+          (event: DebateProgressEvent) => {
+            console.log('Enhanced Debate Progress:', event.stage, event.data);
+
+            // Question started
+            if (event.stage === 'question_debate_started') {
+              setDebateState((prev) => ({
+                ...prev,
+                progress: `Debating question ${event.data.questionIndex + 1}/${event.data.totalQuestions}: ${event.data.question}`,
+                currentQuestionIndex: event.data.questionIndex,
+              }));
+            }
+
+            // Postures generated for current question
+            if (event.stage === 'postures_generated') {
+              const initialProgress: DebaterProgress[] = event.data.postures.map((p: string, i: number) => ({
+                index: i,
+                posture: p,
+                status: 'idle' as const,
+              }));
+              setDebateState((prev) => ({
+                ...prev,
+                postures: event.data.postures,
+                topics: event.data.topics,
+                debaterProgress: initialProgress,
+              }));
+            }
+
+            // Debater started
+            if (event.stage === 'debater_started') {
+              setDebateState((prev) => {
+                const newProgress = [...prev.debaterProgress];
+                if (newProgress[event.data.debaterIndex]) {
+                  newProgress[event.data.debaterIndex].status = 'running';
+                }
+                return { ...prev, debaterProgress: newProgress };
+              });
+            }
+
+            // Debater complete
+            if (event.stage === 'debater_complete') {
+              setDebateState((prev) => {
+                const newProgress = [...prev.debaterProgress];
+                if (newProgress[event.data.debaterIndex]) {
+                  newProgress[event.data.debaterIndex] = {
+                    ...newProgress[event.data.debaterIndex],
+                    status: 'complete',
+                    argument: event.data.argument,
+                  };
+                }
+                return { ...prev, debaterProgress: newProgress };
+              });
+            }
+
+            // Initial arguments complete
+            if (event.stage === 'initial_arguments_complete') {
+              setDebateState((prev) => ({
+                ...prev,
+                arguments: event.data.arguments,
+                progress: 'Initial arguments complete. Starting debate rounds...',
+              }));
+            }
+
+            // Round started
+            if (event.stage === 'round_started') {
+              setDebateState((prev) => ({
+                ...prev,
+                progress: `Round ${event.data.roundNumber}/${event.data.totalRounds} started...`,
+              }));
+            }
+
+            // Round complete - update current rounds
+            if (event.stage === 'round_complete') {
+              setDebateState((prev) => {
+                const existingRounds = prev.currentRounds || [];
+                return {
+                  ...prev,
+                  currentRounds: [...existingRounds, {
+                    roundNumber: event.data.roundNumber,
+                    exchanges: event.data.exchanges,
+                  }],
+                  progress: `Round ${event.data.roundNumber} complete`,
+                };
+              });
+            }
+
+            // Judging
+            if (event.stage === 'Judging full debate...') {
+              setDebateState((prev) => ({
+                ...prev,
+                status: 'judging',
+                progress: 'Judging the full debate...',
+              }));
+            }
+
+            // Question debate complete
+            if (event.stage === 'question_debate_complete') {
+              setDebateState((prev) => ({
+                ...prev,
+                progress: `Completed question ${event.data.questionIndex + 1}`,
+                currentRounds: undefined, // Clear for next question
+              }));
+            }
+
+            // Generating consolidated report
+            if (event.stage === 'Generating consolidated report...') {
+              setDebateState((prev) => ({
+                ...prev,
+                status: 'generating_report',
+                progress: 'Generating consolidated report...',
+              }));
+            }
+          },
+          // On Complete
+          (enhancedReport: EnhancedDebateReport) => {
+            console.log('Enhanced Debate Complete:', enhancedReport);
+            setDebateState((prev) => ({
+              ...prev,
+              status: 'completed',
+              progress: 'Enhanced debate complete!',
+              enhancedReport,
+              currentRounds: undefined,
+              currentQuestionIndex: undefined,
+            }));
+            setLoading(false);
+            resolve(enhancedReport);
+          },
+          // On Error
+          (error: Error) => {
+            console.error('Enhanced Debate Error:', error);
+            setDebateState((prev) => ({
+              ...prev,
+              status: 'error',
+              progress: '',
+              error: error.message,
+            }));
+            setLoading(false);
+            reject(error);
+          }
+        );
+      });
+    },
+    [debateState.history]
+  );
+
   return {
     debateState,
     loading,
     fetchQuestions,
     fetchPostures,
     runDebate,
+    runEnhancedDebate,  // ← NEW
     loadDebateFromHistory,
     reset,
   };
