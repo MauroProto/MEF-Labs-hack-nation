@@ -34,11 +34,21 @@ export interface BaseNodeProps {
 export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
   const { config, locked = false } = data;
   const { toggleNodeLock } = useCanvasStore();
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
 
   const handleLockToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleNodeLock(id);
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, locked: !locked },
+              draggable: locked, // If currently locked, make draggable
+            }
+          : node
+      )
+    );
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -46,16 +56,39 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
     deleteElements({ nodes: [{ id }] });
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, locked: !locked },
+              draggable: locked, // If currently locked, make draggable
+            }
+          : node
+      )
+    );
+  };
+
   const Icon = config.icon;
 
   return (
     <div
       className={cn(
-        'rounded-lg border bg-white text-gray-900 h-full w-full',
-        selected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200',
-        locked && 'nopan'
+        'rounded-lg border-[3px] bg-white text-gray-900',
+        selected && !locked && 'border-blue-500 ring-1 ring-blue-200',
+        !selected && !locked && 'border-gray-200',
+        locked && 'border-orange-500 ring-2 ring-orange-200 nopan'
       )}
-      style={{ minWidth: config.defaultWidth, minHeight: config.defaultHeight }}
+      style={{
+        width: '100%',
+        height: '100%',
+        minWidth: config.defaultWidth,
+        minHeight: config.defaultHeight,
+        willChange: selected ? 'width, height' : 'auto'
+      }}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Node Resizer - only show when selected */}
       {selected && !locked && (
@@ -64,7 +97,8 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
           minHeight={config.defaultHeight}
           isVisible={selected}
           lineClassName="border-blue-500"
-          handleClassName="h-3 w-3 bg-white border-2 border-blue-500 rounded"
+          handleClassName="h-5 w-5 bg-white border-2 border-blue-500 rounded"
+          keepAspectRatio={false}
         />
       )}
 
@@ -91,8 +125,8 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
       <div className="flex items-center justify-between px-2.5 py-1.5 bg-white border-b border-gray-200 rounded-t-lg">
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-1 rounded-sm" style={{ backgroundColor: config.color }} />
-          <Icon className="h-3.5 w-3.5 text-gray-600" />
-          <span className="font-medium text-xs text-gray-900">{data.label}</span>
+          <Icon className="h-4 w-4 text-gray-600" />
+          <span className="font-medium text-sm text-gray-900">{data.label}</span>
         </div>
 
         <div className="flex items-center gap-0.5">
@@ -116,10 +150,12 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
 
       {/* Content */}
       <div
-        className="text-xs text-gray-700 overflow-hidden"
+        className="overflow-hidden"
         style={{
           height: 'calc(100% - 36px)',
-          minHeight: `calc(${config.defaultHeight}px - 36px)`
+          minHeight: `calc(${config.defaultHeight}px - 36px)`,
+          padding: 0,
+          margin: 0
         }}
       >
         {children}

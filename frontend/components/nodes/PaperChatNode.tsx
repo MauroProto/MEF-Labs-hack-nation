@@ -55,6 +55,17 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
       setInput('');
       setLoading(true);
 
+      // Create placeholder assistant message for streaming
+      const assistantMessageId = `msg-${Date.now()}-ai`;
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
@@ -65,18 +76,32 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
           }),
         });
 
-        if (!response.ok) throw new Error('Chat API unavailable');
+        if (!response.ok || !response.body) throw new Error('Chat API unavailable');
 
-        const result = await response.json();
-        const assistantMessage: Message = {
-          id: `msg-${Date.now()}-ai`,
-          role: 'assistant',
-          content: result.message,
-          timestamp: new Date(),
-        };
+        // Read the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedContent = '';
 
-        setMessages((prev) => [...prev, assistantMessage]);
-        data.messages = [...messages, userMessage, assistantMessage];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedContent += chunk;
+
+          // Update the assistant message with accumulated content
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: accumulatedContent }
+                : msg
+            )
+          );
+        }
+
+        // Save final messages
+        data.messages = [...messages, userMessage, { ...assistantMessage, content: accumulatedContent }];
       } catch (error) {
         console.warn('Falling back to client-side response.', error);
         const snippet = (connectedPaper.abstract || connectedPaper.fullText || '').slice(0, 1500);
@@ -86,14 +111,14 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
             }\n\n---\n\n**Note:** Add your OpenAI API key to \`.env.local\` to enable AI-powered responses.\n\nFor now, here's the relevant context from the paper. The PDF text has been successfully extracted and is available for AI analysis once you configure your API key.`
           : `**No text extracted yet.**\n\nThe PDF content could not be extracted. Try:\n1. Re-uploading the PDF\n2. Using manual text entry\n3. Checking the PDF format\n\nOr add your OpenAI API key to enable AI-powered analysis.`;
 
-        const assistantMessage: Message = {
-          id: `msg-${Date.now()}-fallback`,
-          role: 'assistant',
-          content: fallbackContent,
-          timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, assistantMessage]);
+        // Update assistant message with fallback
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: fallbackContent }
+              : msg
+          )
+        );
       } finally {
         setLoading(false);
       }
@@ -107,11 +132,11 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
         {/* Connected Paper Indicator */}
         {connectedPaper ? (
           <div className="p-2 bg-blue-50 rounded-t border-b border-blue-100 flex items-start gap-2 flex-shrink-0">
-            <FileText className="h-3.5 w-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-blue-900 truncate">{connectedPaper.title}</div>
+              <div className="text-sm font-medium text-blue-900 truncate">{connectedPaper.title}</div>
               {connectedPaper.authors && connectedPaper.authors.length > 0 && (
-                <div className="text-[9px] text-blue-600 truncate mt-0.5">
+                <div className="text-xs text-blue-600 truncate mt-0.5">
                   {connectedPaper.authors.map(a => a.name).join(', ')}
                 </div>
               )}
@@ -119,55 +144,60 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
           </div>
         ) : (
           <div className="p-2 bg-amber-50 rounded-t border-b border-amber-200 flex-shrink-0">
-            <div className="text-[11px] text-amber-900 font-medium">No paper connected</div>
-            <div className="text-[9px] text-amber-700 mt-0.5">Connect a paper node to enable chat</div>
+            <div className="text-sm text-amber-900 font-medium">No paper connected</div>
+            <div className="text-xs text-amber-700 mt-0.5">Connect a paper node to enable chat</div>
           </div>
         )}
 
         {/* Chat Messages Area - Flexible height */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-50">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
-              <MessageCircle className="h-8 w-8 mb-2" />
-              <p className="text-xs text-center px-4">
+              <MessageCircle className="h-10 w-10 mb-3" />
+              <p className="text-sm text-center px-4">
                 {connectedPaper
                   ? 'Ask questions about this paper'
                   : 'Connect a paper to start chatting'}
               </p>
             </div>
           ) : (
-            <>
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`px-3 py-2 rounded-lg text-xs max-w-[85%] ${
-                      message.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white text-gray-900 border border-gray-200'
-                    }`}
-                  >
+            <div className="space-y-6">
+              {messages.map((message, index) => (
+                <div key={message.id} className="space-y-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`font-semibold text-base ${
+                      message.role === 'user' ? 'text-blue-600' : 'text-gray-900'
+                    }`}>
+                      {message.role === 'user' ? 'You' : 'Assistant'}
+                    </span>
+                    <span className="text-sm text-gray-400">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className={`text-base leading-relaxed ${
+                    message.role === 'user' ? 'text-gray-700' : 'text-gray-900'
+                  }`}>
                     {message.role === 'assistant' ? (
-                      <div className="prose prose-xs max-w-none">
+                      <div className="prose prose-sm max-w-none">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
+                            p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                            ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="mb-3 ml-5 list-decimal space-y-1">{children}</ol>,
                             li: ({ children }) => <li>{children}</li>,
                             code: ({ children }) => (
-                              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">
+                              <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono text-gray-800">
                                 {children}
                               </code>
                             ),
                             pre: ({ children }) => (
-                              <pre className="bg-gray-100 p-2 rounded text-[10px] overflow-x-auto mb-2 font-mono">
+                              <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto mb-3 font-mono">
                                 {children}
                               </pre>
                             ),
+                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                            em: ({ children }) => <em className="italic">{children}</em>,
                           }}
                         >
                           {message.content}
@@ -177,17 +207,20 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
                       <div className="whitespace-pre-wrap break-words">{message.content}</div>
                     )}
                   </div>
+                  {message.role === 'assistant' && index < messages.length - 1 && (
+                    <div className="border-b border-gray-200 pt-3" />
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
-            </>
+            </div>
           )}
         </div>
 
         {/* Input Area - Fixed at bottom */}
         <form
           onSubmit={handleSendMessage}
-          className="flex-shrink-0 flex items-center gap-2 p-2 bg-white border-t border-gray-200 rounded-b"
+          className="flex-shrink-0 flex items-center gap-3 p-4 bg-white border-t border-gray-200 rounded-b"
         >
           <input
             type="text"
@@ -195,15 +228,15 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
             onChange={(e) => setInput(e.target.value)}
             placeholder={connectedPaper ? 'Ask a question…' : 'Connect a paper first'}
             disabled={loading || !connectedPaper}
-            className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+            className="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
           />
           <button
             type="submit"
             disabled={!input.trim() || loading || !connectedPaper}
-            className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+            className="p-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
             title="Send message"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
           </button>
         </form>
 

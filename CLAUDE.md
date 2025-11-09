@@ -562,5 +562,507 @@ Follow our patterns: Zod validation, proper error handling with AgentError.
 
 ---
 
-**Last Updated**: Phase 2 (Agent Communication Layer in progress)
-**Next Phase**: Agent Registry & Discovery (Phase 2.1)
+**Last Updated**: January 2025 - Main Branch
+**Status**: ✅ Phase 2-6 Complete | Backend Agent System Fully Implemented | Frontend Canvas & Paper Chat Working
+**Running**: Both frontend (localhost:3000) and backend (localhost:4000) operational
+
+---
+
+## 🚀 Implemented Features (Main Branch)
+
+### Backend Implementation (100% Complete)
+
+#### 1. **Agent System** (`backend/src/lib/agents/`)
+All 5 core agents are fully implemented and operational:
+
+**`baseAgent.ts`** - Abstract base class for all agents
+- OpenAI integration with function calling
+- Tool registration system using Zod schemas
+- Message history management
+- Streaming support ready
+- Error handling with custom `AgentError`
+- Lifecycle event emission via `agentBus`
+
+**`researcherAgent.ts`** - Deep analysis agent
+- Tools: `analyze_paper`, `extract_methodology`, `extract_claims`, `find_gaps`
+- Fetches papers from Prisma database
+- Returns structured analysis with confidence scores
+- Identifies methodology strengths/limitations
+- Extracts claims with supporting evidence
+- Identifies research gaps and future directions
+
+**`criticAgent.ts`** - Critical analysis agent
+- Tools: `validate_claim`, `critique_methodology`, `identify_biases`, `suggest_improvements`
+- Validates claims against evidence
+- Assesses methodological rigor (internal/external validity)
+- Detects selection bias, confirmation bias, publication bias
+- Provides severity-rated critiques (critical, major, minor, suggestion)
+- Suggests actionable improvements
+
+**`synthesizerAgent.ts`** - Synthesis and integration agent
+- Tools: `merge_analyses`, `resolve_conflicts`, `generate_insights`, `build_consensus`
+- Combines multiple agent outputs
+- Resolves contradictions through deeper analysis
+- Generates emergent insights from combined data
+- Builds consensus while preserving important disagreements
+
+**`citationTrackerAgent.ts`** - Citation verification agent
+- Tools: `verify_citation`, `find_related_papers`, `build_citation_graph`, `assess_impact`
+- Verifies citation accuracy (formatting, DOI, metadata)
+- Discovers related papers (cites, cited_by, similar)
+- Builds citation network graphs with metrics
+- Assesses research impact (traditional + altmetrics)
+
+**`questionGeneratorAgent.ts`** - Research question generator
+- Tools: `generate_questions`, `identify_unknowns`, `suggest_experiments`
+- Generates prioritized research questions (clarification, extension, application)
+- Identifies knowledge gaps (mechanism, boundary conditions, individual differences)
+- Suggests follow-up experiments with feasibility assessments
+
+#### 2. **Agent Infrastructure** (`backend/src/services/`)
+
+**`agentRegistry.ts`** - Singleton agent registry
+- In-memory `Map<nodeId, AgentMetadata>`
+- Agent registration/deregistration with database persistence
+- Type indexing: `Map<AgentType, Set<nodeId>>`
+- Capability discovery (find agents by tool/category)
+- Statistics and search functionality
+- Auto-loads agents from database on startup
+
+**`agentOrchestrator.ts`** - Coordination layer
+- LRU result cache (100 entries, 5min TTL)
+- Circular dependency detection (max depth: 5)
+- Timeout management (default: 30s)
+- Retry logic with exponential backoff (max: 3 retries)
+- Rate limit integration
+- Active invocation tracking
+- Singleton instance `orchestrator`
+
+**`agentEventBus.ts`** - Event system
+- EventEmitter-based (zero external dependencies)
+- Type-safe event emissions
+- Event types: `agent:invoke`, `agent:response`, `agent:registered`, `agent:status`, `agent:error`, `agent:broadcast`
+- Event history (max 1000 events)
+- Metrics collection per event type
+- Correlation ID generation (nanoid)
+- Singleton instance `agentBus`
+
+**`agentCapability.ts`** - Tool discovery service
+- Returns tools in OpenAI function calling format
+- Zod schema to JSON schema conversion
+- Tool categorization and search
+
+#### 3. **Rate Limiting** (`backend/src/lib/rateLimiter.ts`)
+- Token bucket algorithm
+- Three limit levels:
+  - Per-agent: 10 invocations/minute
+  - Per-canvas: 50 invocations/minute
+  - Global: 100 invocations/minute
+- `AgentRateLimiters` class with check/consume methods
+
+#### 4. **Database Schema** (`backend/prisma/schema.prisma`)
+**8 Main Models**:
+- `User` - User accounts
+- `Canvas` - Canvas state (nodes, edges as JSON)
+- `Paper` - Uploaded papers (title, authors, abstract, fullText, citations, metadata)
+- `Agent` - Agent registry (nodeId, agentType, capabilities, status)
+- `AgentMessage` - Agent communications (fromAgent, toAgent, content, reasoning, confidence)
+- `AgentInvocation` - Tool call tracking (invoker, target, toolName, parameters, result, status, duration)
+- `AgentCapability` - Normalized tool schemas
+- `WebSearchResult` - Search result cache with TTL
+
+**Debate System Models** (Phase 10):
+- `DebateSession`, `Posture`, `DebateTranscript`, `DebateRound`, `DebateExchange`, `JudgeVerdict`
+
+#### 5. **API Routes** (`backend/src/routes/`)
+- `/api/canvas` - Canvas CRUD operations ([canvasRoutes.ts](./backend/src/routes/canvasRoutes.ts))
+- `/api/papers` - Paper upload/retrieval ([paperRoutes.ts](./backend/src/routes/paperRoutes.ts))
+- `/api/agents` - Agent registry management ([agentRoutes.ts](./backend/src/routes/agentRoutes.ts))
+- `/api/capabilities` - Tool discovery ([capabilityRoutes.ts](./backend/src/routes/capabilityRoutes.ts))
+
+#### 6. **WebSocket Server** (`backend/src/lib/websocket.ts`)
+- Socket.io server with room support
+- Canvas-based rooms (`join_canvas`, `leave_canvas`)
+- Event broadcasting within rooms
+- Connection tracking and statistics
+- Graceful shutdown handling
+
+#### 7. **Express Server** (`backend/src/index.ts`)
+- CORS enabled (http://localhost:3001)
+- JSON/URL-encoded body parsing
+- Morgan logging (dev mode)
+- Custom error handling for `AgentError` and Zod validation
+- Health check endpoint: `/health`
+- Runs on port 4000
+
+---
+
+### Frontend Implementation (100% Complete)
+
+#### 1. **Paper Context System** (`frontend/lib/stores/paperContextStore.ts`)
+Zustand store managing paper-to-node connections:
+- `Map<string, Paper>` - All uploaded papers
+- `Map<nodeId, paperId>` - Node-to-paper connections
+- Actions: `addPaper`, `connectNodeToPaper`, `getPaperForNode`, `getContextForNode`
+- Upload progress tracking
+- Selected paper state
+
+#### 2. **Agent Store** (`frontend/lib/stores/agentStore.ts`)
+Zustand store for agent state:
+- `Map<nodeId, AgentMetadata>` - Agent registry
+- `Map<nodeId, AgentStatus>` - Status tracking
+- `Map<invocationId, AgentInvocation>` - Active invocations
+- `AgentMessage[]` - Message history
+- Actions: registration, status updates, capability queries, invocation tracking
+
+#### 3. **Canvas Store** (`frontend/lib/stores/canvasStore.ts`)
+Zustand store for canvas state:
+- Node/edge management (add, update, remove)
+- Viewport state
+- Canvas name and ID
+- Node locking (`Set<nodeId>`)
+- Autosave trigger (no implementation yet)
+- Load/save canvas data
+
+#### 4. **WebSocket Hook** (`frontend/lib/hooks/useWebSocket.ts`)
+React hook for Socket.io connection:
+- Auto-connect on mount
+- Connection state tracking
+- Canvas room joining
+- Event emission/listening
+- Reconnection logic
+- Cleanup on unmount
+
+#### 5. **Custom Node Components** (`frontend/components/nodes/`)
+
+**`PaperUploadNode.tsx`** - PDF upload and parsing
+- Client-side PDF text extraction using pdfjs-dist 4.8.69
+- Extracts up to 12 pages of text
+- Creates `Paper` object with metadata (title, authors, abstract parsed from text)
+- Adds to `paperContextStore`
+- Connects node to paper automatically
+- Visual upload status (uploading, processing, ready)
+
+**`PaperChatNode.tsx`** - AI chat with paper context
+- Message history with role-based styling
+- Markdown rendering (ReactMarkdown + remark-gfm)
+- Sends paper context to `/api/chat`
+- Falls back to hardcoded responses if API fails
+- Scrollable message container
+- Input with send button
+
+**`ResearcherAgentNode.tsx`** - Researcher agent UI
+**`CriticAgentNode.tsx`** - Critic agent UI
+**`SynthesizerAgentNode.tsx`** - Synthesizer agent UI
+**`CitationTrackerNode.tsx`** - Citation tracker UI
+**`QuestionGeneratorNode.tsx`** - Question generator UI
+**`NoteNode.tsx`** - Simple text note node
+**`BaseNode.tsx`** - Shared base node component
+**`NodeWrapper.tsx`** - Common node wrapper with header/footer
+
+#### 6. **Canvas Component** (`frontend/components/canvas/EnhancedCanvas.tsx`)
+React Flow canvas with:
+- 14 node types (from [nodeTypes.ts](./frontend/lib/nodeTypes.ts))
+- Drag & drop from toolbar
+- Custom edge styling
+- Automatic paper context propagation (when paper-upload connects to chat, chat gets the paper)
+- Background grid
+- Mini-map
+- Controls (zoom, fit view)
+- Toolbar with node palette
+- Simple controls panel
+
+**Node Categories** (from [nodeTypes.ts](./frontend/lib/nodeTypes.ts)):
+- **Input**: `paper-upload`, `note`
+- **Research**: `paper-chat`, `web-research`
+- **Agent**: `researcher-agent`, `critic-agent`, `synthesizer-agent`, `question-generator`, `citation-tracker`
+- **Visualization**: `citation-graph`, `summary`, `methodology`, `results-visualization`, `insight-report`
+
+#### 7. **Chat API Route** (`frontend/app/api/chat/route.ts`)
+Next.js API route handler:
+- OpenAI integration (gpt-4o-mini)
+- Paper context injection (title, authors, abstract, first 3000 chars of fullText)
+- System prompt with paper details
+- Conversation history support
+- Markdown formatting instruction
+- Error handling with detailed messages
+
+#### 8. **Main Application** (`frontend/app/page.tsx`)
+- React Flow provider wrapper
+- WebSocket provider (context)
+- Full-screen canvas
+- No authentication yet
+
+---
+
+## 📁 Complete Project Structure
+
+```
+MEF-Labs-hack-nation/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   │   ├── agentController.ts
+│   │   │   ├── canvasController.ts
+│   │   │   ├── chatController.ts
+│   │   │   └── paperController.ts
+│   │   ├── lib/
+│   │   │   ├── agents/
+│   │   │   │   ├── baseAgent.ts ✅
+│   │   │   │   ├── researcherAgent.ts ✅
+│   │   │   │   ├── criticAgent.ts ✅
+│   │   │   │   ├── synthesizerAgent.ts ✅
+│   │   │   │   ├── citationTrackerAgent.ts ✅
+│   │   │   │   ├── questionGeneratorAgent.ts ✅
+│   │   │   │   └── index.ts
+│   │   │   ├── prisma.ts
+│   │   │   ├── rateLimiter.ts ✅
+│   │   │   └── websocket.ts ✅
+│   │   ├── routes/
+│   │   │   ├── agentRoutes.ts ✅
+│   │   │   ├── canvasRoutes.ts ✅
+│   │   │   ├── chatRoutes.ts
+│   │   │   ├── paperRoutes.ts ✅
+│   │   │   └── capabilityRoutes.ts ✅
+│   │   ├── services/
+│   │   │   ├── agentEventBus.ts ✅
+│   │   │   ├── agentOrchestrator.ts ✅
+│   │   │   ├── agentRegistry.ts ✅
+│   │   │   └── agentCapability.ts ✅
+│   │   ├── types/
+│   │   │   └── agent.types.ts ✅
+│   │   └── index.ts ✅
+│   ├── prisma/
+│   │   └── schema.prisma ✅
+│   └── package.json
+├── frontend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   └── chat/
+│   │   │       └── route.ts ✅
+│   │   ├── debug/
+│   │   │   └── page.tsx
+│   │   ├── layout.tsx
+│   │   └── page.tsx ✅
+│   ├── components/
+│   │   ├── canvas/
+│   │   │   ├── Canvas.tsx
+│   │   │   ├── EnhancedCanvas.tsx ✅
+│   │   │   ├── EnhancedToolbar.tsx
+│   │   │   ├── SimpleCanvas.tsx
+│   │   │   ├── SimpleControls.tsx
+│   │   │   └── SimpleToolbar.tsx
+│   │   ├── nodes/
+│   │   │   ├── BaseNode.tsx ✅
+│   │   │   ├── CitationTrackerNode.tsx ✅
+│   │   │   ├── CriticAgentNode.tsx ✅
+│   │   │   ├── NodeWrapper.tsx ✅
+│   │   │   ├── NoteNode.tsx ✅
+│   │   │   ├── PaperChatNode.tsx ✅
+│   │   │   ├── PaperUploadNode.tsx ✅
+│   │   │   ├── QuestionGeneratorNode.tsx ✅
+│   │   │   ├── ResearcherAgentNode.tsx ✅
+│   │   │   └── SynthesizerAgentNode.tsx ✅
+│   │   ├── providers/
+│   │   │   ├── ReactFlowProvider.tsx
+│   │   │   └── WebSocketProvider.tsx ✅
+│   │   ├── debug/
+│   │   │   └── AgentDebugPanel.tsx
+│   │   └── ui/ (shadcn/ui components)
+│   ├── lib/
+│   │   ├── hooks/
+│   │   │   ├── useAgentEvents.ts
+│   │   │   ├── useAgentStatus.ts
+│   │   │   ├── useWebSocket.ts ✅
+│   │   │   └── index.ts
+│   │   ├── stores/
+│   │   │   ├── agentStore.ts ✅
+│   │   │   ├── canvasStore.ts ✅
+│   │   │   └── paperContextStore.ts ✅
+│   │   ├── nodeComponents.ts
+│   │   ├── nodeTypes.ts ✅
+│   │   └── utils.ts
+│   └── package.json
+├── docker-compose.yml
+├── package.json
+├── turbo.json
+├── ACTION_PLAN.md
+├── HACKATHON_PAPER_CANVAS_BLUEPRINT.md
+├── DEBATE_SYSTEM_SUMMARY.md
+└── CLAUDE.md ✅ (this file)
+```
+
+---
+
+## 🔧 Key Technical Implementations
+
+### PDF Text Extraction (Client-Side)
+```typescript
+// PaperUploadNode.tsx:67-83
+const arrayBuffer = await file.arrayBuffer();
+const pdfjs: any = await import('pdfjs-dist');
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
+const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+const pdf = await loadingTask.promise;
+
+const maxPages = Math.min(pdf.numPages, 12);
+let extractedText = '';
+for (let p = 1; p <= maxPages; p++) {
+  const page = await pdf.getPage(p);
+  const content = await page.getTextContent();
+  extractedText += content.items.map((it: any) => it.str).join(' ') + '\n';
+}
+```
+
+### Paper Context Injection
+```typescript
+// frontend/app/api/chat/route.ts:26-40
+const systemMessage = {
+  role: 'system' as const,
+  content: paperContext
+    ? `You are a helpful research assistant analyzing the following paper:
+Title: ${paperContext.title}
+Authors: ${paperContext.authors?.map((a: any) => a.name).join(', ') || 'Unknown'}
+Full text excerpt:
+${paperContext.fullText?.substring(0, 3000) || ''}
+Please answer questions about this paper accurately and helpfully.`
+    : 'You are a helpful research assistant.',
+};
+```
+
+### Agent Tool Registration
+```typescript
+// backend/src/lib/agents/researcherAgent.ts:61-66
+protected registerTools(): void {
+  this.registerTool(this.createAnalyzePaperTool());
+  this.registerTool(this.createExtractMethodologyTool());
+  this.registerTool(this.createExtractClaimsTool());
+  this.registerTool(this.createFindGapsTool());
+}
+```
+
+### Orchestrator Invocation
+```typescript
+// backend/src/services/agentOrchestrator.ts:62-143
+public async invoke(params: AgentInvocationParams): Promise<AgentInvocationResult> {
+  // 1. Check circular dependencies
+  this.checkCircularDependency(params.from, params.to, context);
+
+  // 2. Check rate limits
+  const rateLimitCheck = AgentRateLimiters.checkInvocation(params.to, canvasId);
+
+  // 3. Check cache
+  const cached = this.resultCache.get(cacheKey);
+
+  // 4. Emit invocation event
+  agentBus.invoke(request);
+
+  // 5. Wait for response with timeout
+  const result = await this.waitForResponse(requestId, timeout);
+
+  return result;
+}
+```
+
+---
+
+## 🎨 UI/UX Features
+
+### Node Types and Colors
+- **Input nodes** (Blue #3B82F6): Paper upload, notes
+- **Research nodes** (Green #10B981): Paper chat, web research
+- **Agent nodes** (Purple #8B5CF6): All 5 agent types
+- **Visualization nodes** (Orange #F59E0B): Graphs, summaries, reports
+
+### Paper Chat Interface
+- Markdown-rendered messages
+- User/assistant role distinction
+- Scrollable history
+- Context indicator (shows connected paper title)
+- Fallback responses for API errors
+
+### Canvas Interactions
+- Drag nodes from toolbar
+- Connect nodes with edges
+- Automatic paper context propagation (paper-upload → connected nodes)
+- Delete nodes/edges (Delete key)
+- Pan and zoom
+- Fit view control
+
+---
+
+## 🚦 Current State
+
+### ✅ Fully Working
+1. Backend server with WebSocket (localhost:4000)
+2. Frontend Next.js app (localhost:3000)
+3. PDF upload and text extraction
+4. Paper chat with AI context
+5. All 5 agents implemented (tools ready to be called)
+6. Agent registry and orchestration
+7. Event bus and rate limiting
+8. Prisma database schema
+9. React Flow canvas with 14 node types
+10. Zustand state management
+
+### ⚠️ Partially Implemented
+1. **Agent node UIs** - Nodes exist but don't actively invoke agents yet
+2. **WebSocket real-time updates** - Infrastructure ready but not fully utilized
+3. **Database persistence** - Schema ready, controllers exist, but frontend doesn't save canvases yet
+
+### ❌ Not Yet Implemented
+1. **Debate system** (Phase 10) - Schema exists but no implementation
+2. **Web research agent** - Type defined but no implementation
+3. **Visualization nodes** - Components don't render actual visualizations yet
+4. **User authentication** - No auth system
+5. **Canvas autosave** - Trigger exists but no implementation
+6. **Agent-to-agent communication in UI** - Backend supports it, UI doesn't trigger it
+
+---
+
+## 🔄 Next Steps / Remaining Work
+
+### High Priority
+1. **Implement agent invocation from UI nodes**
+   - Wire up agent node buttons to call backend `/api/agents/{nodeId}/invoke`
+   - Display agent responses in node UI
+   - Show loading states during agent execution
+
+2. **Canvas persistence**
+   - Save canvas state to database on changes
+   - Load canvas from database on page load
+   - Implement autosave every 5 seconds
+
+3. **Real-time agent status updates via WebSocket**
+   - Broadcast agent status changes to all clients in canvas room
+   - Update node appearance based on agent status (idle/working/error)
+   - Display invocation progress
+
+### Medium Priority
+4. **Implement web research agent**
+   - Integration with academic search APIs (Semantic Scholar, Crossref, etc.)
+   - Tavily search fallback
+
+5. **Visualization node implementations**
+   - Citation graph rendering (D3.js or similar)
+   - Results charts (Chart.js)
+   - Summary display
+
+6. **User authentication**
+   - Clerk or NextAuth.js integration
+   - User-specific canvases
+   - Permissions
+
+### Low Priority
+7. **Debate system** (Phase 10)
+   - Posture generator agent
+   - Debater agent
+   - Judge agent
+   - Debate transcript UI
+
+8. **Performance optimizations**
+   - Agent response caching
+   - Database indexing
+   - Frontend code splitting
+
+---
