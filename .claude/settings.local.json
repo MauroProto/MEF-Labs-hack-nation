@@ -22,7 +22,8 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(del PHASE_2_COMPLETE.md DAY_1_COMPLETE.md DEBATE_SYSTEM_SUMMARY.md PHASE5_COMPLETE.md PHASE4_COMPLETE.md PHASE3_COMPLETE.md PHASE6_COMPLETE.md PHASE6_BACKEND_COMPLETE.md MAW_MERGE_ANALYSIS.md SETUP_COMPLETE.md)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []
