@@ -6,6 +6,11 @@ import {
 } from "../../types/debate.types";
 
 export class JudgeAgent extends BaseDebateAgent {
+  constructor() {
+    // Use lower temperature for more consistent, faster judging
+    super({ temperature: 0.3, maxTokens: 3000 });
+  }
+
   async judge(request: JudgeRequest): Promise<JudgeVerdict> {
     const { question, topics, arguments: debaterArguments, rubric, factCheck } = request;
 
