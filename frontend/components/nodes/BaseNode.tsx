@@ -195,6 +195,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
       <div
         className={cn(
           'nopan',
+          locked && 'nodrag',
           locked ? 'overflow-auto' : 'overflow-hidden'
         )}
         style={{
@@ -204,6 +205,8 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
           margin: 0,
           touchAction: locked ? 'pan-y' : undefined
         }}
+        onMouseDownCapture={locked ? (e) => e.stopPropagation() : undefined}
+        onPointerDownCapture={locked ? (e) => e.stopPropagation() : undefined}
         onWheelCapture={locked ? (e) => e.stopPropagation() : undefined}
         onWheel={locked ? (e) => e.stopPropagation() : undefined}
       >

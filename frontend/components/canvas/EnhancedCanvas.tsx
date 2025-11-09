@@ -47,7 +47,7 @@ function EnhancedCanvasInner() {
   const [showMiniMap, setShowMiniMap] = useState(true);
 
   // Get React Flow instance for viewport-aware positioning and deletion
-  const { screenToFlowPosition, deleteElements } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
 
   // Define custom node types
   const nodeTypes: NodeTypes = useMemo(() => NODE_COMPONENTS, []);
@@ -213,48 +213,10 @@ function EnhancedCanvasInner() {
     }
   }, [nodes, edges, paperConnections, connectNodeToPaper, getPaperForNode]);
 
-  // Handle keyboard delete
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      // Ignore keyboard events if they come from an input, textarea, or contenteditable element
-      const target = event.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return; // Let the element handle its own keyboard events
-      }
-
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Get selected nodes and edges
-        const selectedNodes = nodes.filter((node) => node.selected);
-        const selectedEdges = edges.filter((edge) => edge.selected);
-
-        // Delete selected elements
-        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
-          deleteElements({
-            nodes: selectedNodes,
-            edges: selectedEdges,
-          });
-          event.preventDefault();
-          event.stopPropagation();
-        }
-      }
-    },
-    [nodes, edges, deleteElements]
-  );
-
   return (
     <div
       ref={containerRef}
       style={{ width: '100vw', height: '100vh', outline: 'none' }}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      onFocus={(e) => {
-        // Ensure the div can receive keyboard events
-        e.currentTarget.focus();
-      }}
     >
       <ReactFlow
         nodes={nodes}
@@ -298,8 +260,8 @@ function EnhancedCanvasInner() {
               nodeColor={nodeColor}
               position="bottom-right"
               style={{
-                width: 180,
-                height: 120,
+                width: 240,
+                height: 160,
                 backgroundColor: '#f9fafb',
                 border: '2px solid #e5e7eb',
                 borderRadius: '8px',
@@ -313,7 +275,7 @@ function EnhancedCanvasInner() {
               onClick={() => setShowMiniMap(false)}
               className="absolute bottom-2 bg-white/80 backdrop-blur-sm rounded p-1 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
               title="Hide MiniMap"
-              style={{ right: '168px', pointerEvents: 'auto' }}
+              style={{ right: '228px', pointerEvents: 'auto' }}
             >
               <EyeOff className="h-3 w-3 text-gray-600" />
             </button>

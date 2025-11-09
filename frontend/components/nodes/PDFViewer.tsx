@@ -182,25 +182,10 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
         pointerEvents: 'auto',
         cursor: 'text'
       }}
-      onMouseDownCapture={(e) => {
-        // Stop React Flow capture handlers from swallowing selection
-        e.stopPropagation();
-      }}
-      onPointerDownCapture={(e) => {
-        e.stopPropagation();
-      }}
       onWheel={(e) => e.stopPropagation()}
       onMouseUp={handleMouseUp}
-      onMouseDown={(e) => {
-        // Stop bubbling so React Flow doesn't intercept and prevent selection
-        e.stopPropagation();
-        handleMouseDown();
-      }}
-      onPointerDown={(e) => {
-        // Ensure touch/stylus also avoid React Flow handlers
-        e.stopPropagation();
-        handleMouseDown();
-      }}
+      onMouseDown={handleMouseDown}
+      onPointerDown={handleMouseDown}
     >
       <Document
         file={fileUrl}
