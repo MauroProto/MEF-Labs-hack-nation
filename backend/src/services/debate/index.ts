@@ -5,4 +5,5 @@ export { DebaterAgent } from "./DebaterAgent";
 export { JudgeAgent } from "./JudgeAgent";
 export { ReporterAgent } from "./ReporterAgent";
 export { DebateCoordinator } from "./DebateCoordinator";
+export { webSearch } from "./webSearchService";
 
