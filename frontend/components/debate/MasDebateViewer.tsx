@@ -46,13 +46,17 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
 
       {/* Topics Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="w-full flex flex-wrap gap-2 h-auto">
+        <TabsList className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:flex lg:flex-wrap gap-2 h-auto">
           {report.topics.map((topic, index) => (
-            <TabsTrigger key={index} value={index.toString()} className="text-sm flex-1 min-w-[150px]">
+            <TabsTrigger
+              key={index}
+              value={index.toString()}
+              className="text-xs sm:text-sm whitespace-normal text-center h-auto py-2 px-2"
+            >
               {topic}
             </TabsTrigger>
           ))}
-          <TabsTrigger value="verdict" className="text-sm flex-1 min-w-[150px] bg-amber-50">
+          <TabsTrigger value="verdict" className="text-xs sm:text-sm bg-amber-50 whitespace-normal text-center h-auto py-2 px-2">
             Final Verdict
           </TabsTrigger>
         </TabsList>
@@ -82,17 +86,10 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
                   <Card key={debaterIndex} className={`p-4 border-2 ${colorClass}`}>
                     {/* Posture Header */}
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={colorClass}>
-                          {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📍'}{' '}
-                          {arg.posture}
-                        </Badge>
-                        {debaterVerdict && (
-                          <span className="text-sm font-medium text-gray-600">
-                            Overall: {Math.round(debaterVerdict.totals.weighted)}/100
-                          </span>
-                        )}
-                      </div>
+                      <Badge variant="outline" className={colorClass}>
+                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📍'}{' '}
+                        {arg.posture}
+                      </Badge>
                     </div>
 
                     {/* Claim */}

@@ -37,7 +37,7 @@ Your task is to assess how well each Debater's arguments perform across shared t
 
 ### IMPORTANT NOTE
 
-You are evaluating *language-model arguments*, not human essays. 
+You are evaluating *language-model arguments*, not human essays.
 
 Therefore, your judgment focuses on:
 
@@ -62,9 +62,21 @@ Use this rubric to score each Debater **per topic**:
 | clarity | Precision and readability of reasoning | 0–1 | 0.15 |
 | engagement | Responds to counterpoints, anticipates critique | 0–1 | 0.10 |
 
-Each score is between 0 and 1.  
-Compute the **weighted average** for each topic, then an **overall score** per debater (mean of topic scores).  
-Rank debaters from best to worst.  
+### SCORING GUIDELINES
+
+Use the full range from 0.0 to 1.0 for each criterion:
+
+- **0.9-1.0** = Exceptional (outstanding evidence, flawless logic, comprehensive coverage)
+- **0.7-0.9** = Strong (good evidence, solid reasoning, thorough)
+- **0.5-0.7** = Adequate (some evidence, decent reasoning, partial coverage)
+- **0.3-0.5** = Weak (limited evidence, flawed reasoning, gaps)
+- **0.0-0.3** = Poor (no evidence, faulty logic, minimal coverage)
+
+**Be discerning but fair.** Well-argued positions with good evidence should score 0.7-0.9. Only perfect arguments deserve 1.0.
+
+Each score is between 0 and 1.
+Compute the **weighted average** for each topic, then an **overall score** per debater (mean of topic scores).
+Rank debaters from best to worst.
 Extract the **most valuable insights** (non-obvious conclusions, new syntheses, or reconciling ideas).
 
 ### OUTPUT FORMAT
@@ -112,6 +124,7 @@ Return a JSON object following this schema:
 3. **Posture faithfulness**: Debater must remain loyal to their assigned posture.
 4. **Insight extraction**: Identify arguments that bridge multiple postures or reveal deeper conceptual understanding.
 5. **Avoid bias**: Judge only based on structure and reasoning, not on your own beliefs.
+6. **Score distribution**: Use the full 0.0-1.0 range. Good arguments should score 0.7-0.9, not all clustering around 0.5.
 
 ### END TASK
 
@@ -176,4 +189,3 @@ Evaluate each debater's argument for each topic using the rubric. Provide scores
     return response;
   }
 }
-
