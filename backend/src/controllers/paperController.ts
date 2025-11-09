@@ -9,7 +9,7 @@ import { prisma } from '../lib/prisma';
 
 // Validation schemas
 const CreatePaperSchema = z.object({
-  canvasId: z.string().cuid(),
+  canvasId: z.string().min(1), // Relaxed for hackathon - accept any non-empty string
   title: z.string().min(1),
   authors: z.array(z.string()),
   abstract: z.string().optional(),
