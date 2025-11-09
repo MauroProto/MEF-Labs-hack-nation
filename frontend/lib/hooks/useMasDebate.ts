@@ -262,6 +262,7 @@ export function useMasDebate() {
             } else if (event.stage === 'report_complete') {
               setDebateState((prev) => {
                 // Only save to history if we have all required data
+                const existingHistory = Array.isArray(prev.history) ? prev.history : [];
                 const newHistory = prev.verdict && prev.arguments && prev.postures && prev.topics
                   ? [{
                       id: Date.now().toString(),
@@ -272,8 +273,8 @@ export function useMasDebate() {
                       arguments: prev.arguments,
                       verdict: prev.verdict,
                       report: event.data.report,
-                    }, ...prev.history]
-                  : prev.history;
+                    }, ...existingHistory]
+                  : existingHistory;
 
                 return {
                   ...prev,
@@ -351,7 +352,7 @@ export function useMasDebate() {
       status: 'idle',
       progress: '',
       debaterProgress: [],
-      history: prev.history, // Preserve history
+      history: Array.isArray(prev.history) ? prev.history : [], // Preserve history
     }));
     setLoading(false);
   }, []);
