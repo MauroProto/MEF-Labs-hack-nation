@@ -32,7 +32,8 @@ export type DebaterArgument = {
     topic: string;
     claim: string;
     reasoning: string;
-    cites: {
+    counterpoints: string[];
+    citations: {
       paper?: LookupHit[];
       web?: WebSearchResult[];
     };
@@ -42,7 +43,7 @@ export type DebaterArgument = {
 
 // Judge Types
 export type RubricCriterion = {
-  id: "correctness" | "evidence" | "coverage" | "clarity" | "novelty";
+  id: "value" | "cohesiveness" | "relevance" | "clarity" | "engagement";
   weight: number;
   description: string;
 };
@@ -64,6 +65,7 @@ export type JudgeVerdict = {
   }>;
   bestOverall: string;
   insights: string[];
+  controversialPoints: string[];
 };
 
 // Reporter Output
@@ -124,6 +126,7 @@ export type JudgeRequest = {
   topics: string[];
   arguments: DebaterArgument[];
   rubric: Rubric;
+  factCheck?: any; // FactCheckSummary from FactCheckerAgent
 };
 
 export type ReporterRequest = {
@@ -137,29 +140,29 @@ export type ReporterRequest = {
 // Default Rubric
 export const DEFAULT_RUBRIC: Rubric = [
   {
-    id: "correctness",
-    weight: 0.35,
-    description: "Factual alignment with paper and reputable sources",
+    id: "value",
+    weight: 0.30,
+    description: "Conceptual or argumentative richness; non-triviality",
   },
   {
-    id: "evidence",
+    id: "cohesiveness",
     weight: 0.25,
-    description: "Quality & sufficiency of citations",
+    description: "Internal logic and compatibility across topics",
   },
   {
-    id: "coverage",
-    weight: 0.15,
-    description: "Addressed all required aspects of the topic",
+    id: "relevance",
+    weight: 0.20,
+    description: "Focused on the topic and question",
   },
   {
     id: "clarity",
     weight: 0.15,
-    description: "Precise, unambiguous writing",
+    description: "Precision and readability of reasoning",
   },
   {
-    id: "novelty",
+    id: "engagement",
     weight: 0.10,
-    description: "Non-obvious, valuable angle",
+    description: "Responds to counterpoints, anticipates critique",
   },
 ];
 
