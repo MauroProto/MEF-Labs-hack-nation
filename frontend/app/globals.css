@@ -62,7 +62,7 @@
 
 /* React Flow custom styles */
 .react-flow__node {
-  cursor: grab;
+  cursor: default;
 }
 
 .react-flow__node.dragging {
@@ -73,15 +73,59 @@
   cursor: text;
 }
 
+/* Prevent scroll chaining from node content to page/canvas */
+.nopan {
+  overscroll-behavior: contain; /* keep wheel/touch scroll inside */
+  user-select: text !important; /* allow text selection inside node content */
+}
+
+.nopan * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+}
+
 .react-flow__node.selected {
   outline: none;
 }
 
-.react-flow__edge {
-  cursor: pointer;
+/* Drag handle - only header is draggable */
+.react-flow__node [data-drag-handle] {
+  cursor: grab !important;
 }
 
-.react-flow__edge.selected path { stroke: #3b82f6 !important; }
+.react-flow__node.dragging [data-drag-handle] {
+  cursor: grabbing !important;
+}
+
+/* nopan class prevents canvas panning on scroll/interaction */
+.nopan {
+  cursor: auto !important;
+}
+
+.react-flow__edge {
+  cursor: pointer;
+  transition: stroke-width 0.2s ease;
+}
+
+.react-flow__edge:hover path {
+  stroke: #475569 !important;  /* Darker on hover */
+}
+
+.react-flow__edge.selected path {
+  stroke: #1e40af !important;  /* Darker blue when selected */
+  stroke-width: 4 !important;   /* Thicker when selected */
+}
+
+/* Edge selection indicator */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #1e40af !important;
+}
+
+/* Make edge clickable area larger */
+.react-flow__edge-interaction {
+  stroke-width: 20px !important;
+}
 
 /* Animated connection line */
 @keyframes dash {
@@ -106,3 +150,50 @@
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 ::-webkit-scrollbar-track { background: #f8fafc; }
+
+/* PDF Viewer text selection */
+.react-pdf__Page {
+  position: relative;
+}
+
+.react-pdf__Page__textContent {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  cursor: text !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 10 !important;
+  /* Allow text layer to receive events for selection */
+  pointer-events: auto !important;
+}
+
+.react-pdf__Page__textContent span {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+}
+
+.react-pdf__Page__annotations {
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+
+.react-pdf__Page__canvas {
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+
+/* Blue highlight for selected text in PDF */
+.react-pdf__Page__textContent ::selection {
+  background: rgba(59, 130, 246, 0.4) !important;
+}
+
+.react-pdf__Page__textContent ::-moz-selection {
+  background: rgba(59, 130, 246, 0.4) !important;
+}

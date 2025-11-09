@@ -46,11 +46,21 @@ function EnhancedCanvasInner() {
   // MiniMap visibility state
   const [showMiniMap, setShowMiniMap] = useState(true);
 
-  // Get React Flow instance for viewport-aware positioning
-  const { screenToFlowPosition } = useReactFlow();
+  // Get React Flow instance for viewport-aware positioning and deletion
+  const { screenToFlowPosition, deleteElements } = useReactFlow();
 
   // Define custom node types
   const nodeTypes: NodeTypes = useMemo(() => NODE_COMPONENTS, []);
+
+  // Auto-focus the canvas container on mount to enable keyboard shortcuts
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Focus the container when component mounts
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  }, []);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -112,6 +122,8 @@ function EnhancedCanvasInner() {
           locked: false,
         },
         draggable: true,
+        selectable: true,
+        deletable: true,
         style: {
           width: config.defaultWidth,
           height: config.defaultHeight,
@@ -164,6 +176,8 @@ function EnhancedCanvasInner() {
         locked: false,
       },
       draggable: true,
+      selectable: true,
+      deletable: true,
       style: {
         width: config.defaultWidth,
         height: config.defaultHeight,
@@ -199,8 +213,49 @@ function EnhancedCanvasInner() {
     }
   }, [nodes, edges, paperConnections, connectNodeToPaper, getPaperForNode]);
 
+  // Handle keyboard delete
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      // Ignore keyboard events if they come from an input, textarea, or contenteditable element
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return; // Let the element handle its own keyboard events
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Get selected nodes and edges
+        const selectedNodes = nodes.filter((node) => node.selected);
+        const selectedEdges = edges.filter((edge) => edge.selected);
+
+        // Delete selected elements
+        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+          deleteElements({
+            nodes: selectedNodes,
+            edges: selectedEdges,
+          });
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
+    },
+    [nodes, edges, deleteElements]
+  );
+
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div
+      ref={containerRef}
+      style={{ width: '100vw', height: '100vh', outline: 'none' }}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onFocus={(e) => {
+        // Ensure the div can receive keyboard events
+        e.currentTarget.focus();
+      }}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -215,21 +270,33 @@ function EnhancedCanvasInner() {
         maxZoom={1.5}
         deleteKeyCode="Delete"
         panOnScroll
-        selectionOnDrag
+        panOnDrag={false}
+        selectionOnDrag={false}
         proOptions={{ hideAttribution: true }}
         elevateNodesOnSelect={false}
         nodesDraggable
         nodesConnectable
+        nodesFocusable
+        edgesFocusable
         elementsSelectable
+        selectNodesOnDrag={false}
       >
         <Background color="#e5e7eb" gap={16} size={0.5} />
 
-        {/* MiniMap with Toggle Button */}
+        {/* Controls - moved to top-left */}
+        <Controls
+          showZoom={true}
+          showFitView
+          showInteractive={false}
+          position="top-left"
+        />
+
+        {/* MiniMap with Toggle Button - moved to bottom-right */}
         {showMiniMap ? (
           <>
             <MiniMap
               nodeColor={nodeColor}
-              position="top-left"
+              position="bottom-right"
               style={{
                 width: 180,
                 height: 120,
@@ -244,9 +311,9 @@ function EnhancedCanvasInner() {
             />
             <button
               onClick={() => setShowMiniMap(false)}
-              className="absolute top-2 bg-white/80 backdrop-blur-sm rounded p-1 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
+              className="absolute bottom-2 bg-white/80 backdrop-blur-sm rounded p-1 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
               title="Hide MiniMap"
-              style={{ left: '168px', pointerEvents: 'auto' }}
+              style={{ right: '168px', pointerEvents: 'auto' }}
             >
               <EyeOff className="h-3 w-3 text-gray-600" />
             </button>
@@ -254,20 +321,13 @@ function EnhancedCanvasInner() {
         ) : (
           <button
             onClick={() => setShowMiniMap(true)}
-            className="absolute top-2 left-2 bg-white/80 backdrop-blur-sm rounded p-1.5 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
+            className="absolute bottom-2 right-2 bg-white/80 backdrop-blur-sm rounded p-1.5 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
             title="Show MiniMap"
             style={{ pointerEvents: 'auto' }}
           >
             <Eye className="h-3.5 w-3.5 text-gray-600" />
           </button>
         )}
-
-        <Controls
-          showZoom={true}
-          showFitView
-          showInteractive={false}
-          position="bottom-right"
-        />
 
         {/* Empty State - Welcome Message */}
         {nodes.length === 0 && (

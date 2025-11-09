@@ -31,6 +31,7 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialMessageSentRef = useRef(false);
 
   const { getPaperForNode } = usePaperContextStore();
   const connectedPaper = getPaperForNode(id);
@@ -38,6 +39,95 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-send initial message if provided
+  useEffect(() => {
+    if (data.initialMessage && !initialMessageSentRef.current && connectedPaper && messages.length === 0) {
+      initialMessageSentRef.current = true;
+      console.log('Auto-sending initial message:', data.initialMessage);
+      setInput(data.initialMessage);
+
+      // Trigger send after a short delay to ensure everything is ready
+      setTimeout(() => {
+        const userMessage: Message = {
+          id: `msg-${Date.now()}`,
+          role: 'user',
+          content: data.initialMessage,
+          timestamp: new Date(),
+        };
+
+        setMessages([userMessage]);
+        setInput('');
+        setLoading(true);
+
+        // Create placeholder assistant message for streaming
+        const assistantMessageId = `msg-${Date.now()}-ai`;
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Send to API
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: data.initialMessage }],
+            paperContext: connectedPaper,
+          }),
+        })
+          .then(async (response) => {
+            if (!response.ok || !response.body) throw new Error('Chat API unavailable');
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value, { stream: true });
+              accumulatedContent += chunk;
+
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+            }
+
+            data.messages = [userMessage, { ...assistantMessage, content: accumulatedContent }];
+          })
+          .catch((error) => {
+            console.warn('Falling back to client-side response.', error);
+            const snippet = (connectedPaper.abstract || connectedPaper.fullText || '').slice(0, 1500);
+            const fallbackContent = snippet
+              ? `**Question:** ${userMessage.content}\n\n**Paper Context:** ${connectedPaper.title}\n\n**Relevant Text:**\n${snippet}${
+                  snippet.length === 1500 ? '...' : ''
+                }\n\n---\n\n**Note:** Add your OpenAI API key to \`.env.local\` to enable AI-powered responses.\n\nFor now, here's the relevant context from the paper. The PDF text has been successfully extracted and is available for AI analysis once you configure your API key.`
+              : `**No text extracted yet.**\n\nThe PDF content could not be extracted. Try:\n1. Re-uploading the PDF\n2. Using manual text entry\n3. Checking the PDF format\n\nOr add your OpenAI API key to enable AI-powered analysis.`;
+
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: fallbackContent }
+                  : msg
+              )
+            );
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      }, 100);
+    }
+  }, [data.initialMessage, connectedPaper, messages.length]);
 
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
