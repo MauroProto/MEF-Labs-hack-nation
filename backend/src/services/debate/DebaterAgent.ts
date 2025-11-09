@@ -5,6 +5,7 @@ import {
   DebaterArgument,
   LookupHit,
   Paper,
+  WebSearchResult,
 } from "../../types/debate.types";
 
 export class DebaterAgent extends BaseDebateAgent {
@@ -19,6 +20,7 @@ export class DebaterAgent extends BaseDebateAgent {
 You are Debater "${posture}". You must address every topic in the provided list from the perspective of your posture.
 
 You may call lookupPaper(query) to fetch relevant paper chunks.
+You may call webSearch(query) to search the web for additional context and evidence.
 
 For each topic: make a clear claim, give reasoning, and cite evidence. Then produce a short overallPosition.
 
@@ -61,6 +63,24 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
               query: {
                 type: "string",
                 description: "The search query to find relevant content in the paper",
+              },
+            },
+            required: ["query"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "webSearch",
+          description:
+            "Search the web for additional context, recent developments, or supporting evidence. Returns relevant web results with titles, URLs, and snippets.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query to find relevant information on the web",
               },
             },
             required: ["query"],
@@ -135,8 +155,15 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
             tool_call_id: toolCall.id,
             content: JSON.stringify(result),
           });
+        } else if (toolName === "webSearch") {
+          result = await this.webSearch(toolInput.query);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
         }
-        // Note: webSearch is handled directly by OpenAI's web_search tool
       }
     }
 
@@ -186,6 +213,57 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
 
     // Sort by score and return top 5
     return chunks.sort((a, b) => b.score - a.score).slice(0, 5);
+  }
+
+  private async webSearch(query: string): Promise<WebSearchResult[]> {
+    // Simple web search implementation using Tavily API or similar
+    // For now, return mock data that the debater can use
+    // In production, integrate with Tavily, Google Search API, or similar
+
+    try {
+      // If TAVILY_API_KEY is set, use real search
+      if (process.env.TAVILY_API_KEY) {
+        const response = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            api_key: process.env.TAVILY_API_KEY,
+            query,
+            search_depth: "basic",
+            max_results: 5,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return data.results.map((r: any) => ({
+            title: r.title,
+            url: r.url,
+            snippet: r.content,
+          }));
+        }
+      }
+
+      // Fallback: return helpful message
+      return [
+        {
+          title: "Web search not configured",
+          url: "",
+          snippet: `Web search for "${query}" requires TAVILY_API_KEY environment variable to be set. Using paper citations only.`,
+        },
+      ];
+    } catch (error) {
+      console.error("Web search error:", error);
+      return [
+        {
+          title: "Web search error",
+          url: "",
+          snippet: "Unable to perform web search at this time. Using paper citations only.",
+        },
+      ];
+    }
   }
 }
 

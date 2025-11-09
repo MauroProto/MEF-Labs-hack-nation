@@ -16,7 +16,7 @@ export abstract class BaseDebateAgent {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    this.model = config.model || "gpt-5-2025-08-07";
+    this.model = config.model || "gpt-4o-mini";
     this.maxTokens = config.maxTokens || 4096;
     this.temperature = config.temperature || 0.7;
   }
@@ -40,7 +40,7 @@ export abstract class BaseDebateAgent {
 
     const params: OpenAI.ChatCompletionCreateParams = {
       model: this.model,
-      max_completion_tokens: this.maxTokens,
+      max_tokens: this.maxTokens,
       temperature: this.temperature,
       messages: allMessages,
     };
