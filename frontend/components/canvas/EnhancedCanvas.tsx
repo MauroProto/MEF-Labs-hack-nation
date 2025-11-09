@@ -207,8 +207,8 @@ export function EnhancedCanvas() {
           position="bottom-left"
         />
 
-        {/* Left Toolbar - Node Palette */}
-        <Panel position="top-left">
+        {/* Bottom Toolbar - Node Palette */}
+        <Panel position="bottom-center">
           <EnhancedToolbar onAddNode={addNode} />
         </Panel>
 

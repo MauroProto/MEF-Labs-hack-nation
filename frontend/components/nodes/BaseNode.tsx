@@ -76,7 +76,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border bg-white text-gray-900',
+        'rounded-lg border-2 bg-white text-gray-900',
         selected && !locked && 'border-blue-500 ring-1 ring-blue-200',
         !selected && !locked && 'border-gray-200',
         locked && 'border-orange-500 ring-2 ring-orange-200 nopan'

@@ -135,7 +135,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
             border: 'none',
             margin: 0,
             padding: 0,
-            pointerEvents: selected ? 'none' : 'auto'
+            pointerEvents: (selected && !data.locked) ? 'none' : 'auto'
           }}
         />
       )}
