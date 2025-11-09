@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useCallback, useMemo, useEffect } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -20,8 +20,11 @@ import {
   Edge,
   Panel,
   NodeTypes,
+  ReactFlowProvider,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Eye, EyeOff } from 'lucide-react';
 import { EnhancedToolbar } from './EnhancedToolbar';
 import { SimpleControls } from './SimpleControls';
 import { NODE_COMPONENTS } from '@/lib/nodeComponents';
@@ -32,12 +35,18 @@ const initialNodes: Node[] = [];
 
 const initialEdges: Edge[] = [];
 
-export function EnhancedCanvas() {
+function EnhancedCanvasInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const connectNodeToPaper = usePaperContextStore((s) => s.connectNodeToPaper);
   const getPaperForNode = usePaperContextStore((s) => s.getPaperForNode);
   const paperConnections = usePaperContextStore((s) => s.paperConnections);
+
+  // MiniMap visibility state
+  const [showMiniMap, setShowMiniMap] = useState(true);
+
+  // Get React Flow instance for viewport-aware positioning
+  const { screenToFlowPosition } = useReactFlow();
 
   // Define custom node types
   const nodeTypes: NodeTypes = useMemo(() => NODE_COMPONENTS, []);
@@ -76,14 +85,20 @@ export function EnhancedCanvas() {
       const nodeType = event.dataTransfer.getData('application/reactflow');
       if (!nodeType) return;
 
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const position = {
-        x: event.clientX - reactFlowBounds.left - 150, // Center node
-        y: event.clientY - reactFlowBounds.top - 100,
-      };
-
       const config = NODE_CONFIGS[nodeType as keyof typeof NODE_CONFIGS];
       if (!config) return;
+
+      // Convert screen coordinates to flow coordinates
+      const dropPosition = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // Offset to center the node at drop point
+      const position = {
+        x: dropPosition.x - config.defaultWidth / 2,
+        y: dropPosition.y - config.defaultHeight / 2,
+      };
 
       const newNode: CustomNode = {
         id: `${nodeType}-${Date.now()}`,
@@ -104,7 +119,7 @@ export function EnhancedCanvas() {
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [setNodes]
+    [setNodes, screenToFlowPosition]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -125,14 +140,22 @@ export function EnhancedCanvas() {
       return;
     }
 
-    // Calculate center position
-    const centerX = window.innerWidth / 2 - 150;
-    const centerY = window.innerHeight / 2 - 100;
+    // Calculate center of current viewport
+    const viewportCenter = screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+
+    // Offset to center the node (subtract half of default dimensions)
+    const position = {
+      x: viewportCenter.x - config.defaultWidth / 2,
+      y: viewportCenter.y - config.defaultHeight / 2,
+    };
 
     const newNode: CustomNode = {
       id: `${nodeType}-${Date.now()}`,
       type: nodeType,
-      position: { x: centerX, y: centerY },
+      position,
       data: {
         label: String(config.label), // Ensure it's a string
         type: nodeType as any,
@@ -147,7 +170,7 @@ export function EnhancedCanvas() {
     };
 
     setNodes((nds) => nds.concat(newNode));
-  }, [setNodes]);
+  }, [setNodes, screenToFlowPosition]);
 
   // Keep paper connections in sync for existing edges and late uploads
   useEffect(() => {
@@ -200,11 +223,49 @@ export function EnhancedCanvas() {
       >
         <Background color="#e5e7eb" gap={16} size={0.5} />
 
+        {/* MiniMap with Toggle Button */}
+        {showMiniMap ? (
+          <>
+            <MiniMap
+              nodeColor={nodeColor}
+              position="top-left"
+              style={{
+                width: 180,
+                height: 120,
+                backgroundColor: '#f9fafb',
+                border: '2px solid #e5e7eb',
+                borderRadius: '8px',
+              }}
+              maskColor="rgba(0, 0, 0, 0.05)"
+              nodeStrokeWidth={3}
+              pannable
+              zoomable
+            />
+            <button
+              onClick={() => setShowMiniMap(false)}
+              className="absolute top-2 bg-white/80 backdrop-blur-sm rounded p-1 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
+              title="Hide MiniMap"
+              style={{ left: '168px', pointerEvents: 'auto' }}
+            >
+              <EyeOff className="h-3 w-3 text-gray-600" />
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setShowMiniMap(true)}
+            className="absolute top-2 left-2 bg-white/80 backdrop-blur-sm rounded p-1.5 hover:bg-white transition-all z-10 opacity-60 hover:opacity-100"
+            title="Show MiniMap"
+            style={{ pointerEvents: 'auto' }}
+          >
+            <Eye className="h-3.5 w-3.5 text-gray-600" />
+          </button>
+        )}
+
         <Controls
-          showZoom={false}
+          showZoom={true}
           showFitView
           showInteractive={false}
-          position="bottom-left"
+          position="bottom-right"
         />
 
         {/* Empty State - Welcome Message */}
@@ -241,5 +302,14 @@ export function EnhancedCanvas() {
         </Panel>
       </ReactFlow>
     </div>
+  );
+}
+
+// Wrapper component with ReactFlowProvider
+export function EnhancedCanvas() {
+  return (
+    <ReactFlowProvider>
+      <EnhancedCanvasInner />
+    </ReactFlowProvider>
   );
 }
