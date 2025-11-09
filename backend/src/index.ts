@@ -10,6 +10,7 @@ import capabilityRoutes from './routes/capabilityRoutes';
 import canvasRoutes from './routes/canvasRoutes';
 import paperRoutes from './routes/paperRoutes';
 import debateRoutes from './routes/debateRoutes';
+import masDebateRoutes from './routes/masDebateRoutes';
 
 // WebSocket
 import { initializeWebSocket, getWebSocketManager } from './lib/websocket';
@@ -67,6 +68,7 @@ app.get('/api', (req, res) => {
       agents: '/api/agents',
       capabilities: '/api/capabilities',
       debate: '/api/debate',
+      masDebate: '/api/mas-debate',
     },
   });
 });
@@ -77,6 +79,7 @@ app.use('/api/papers', paperRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/capabilities', capabilityRoutes);
 app.use('/api/debate', debateRoutes);
+app.use('/api/mas-debate', masDebateRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -93,7 +96,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
   // Handle AgentError specifically
   if (err instanceof AgentError) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: {
         code: err.code,
@@ -101,15 +104,17 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
         data: err.data,
       },
     });
+    return;
   }
 
   // Handle Zod validation errors
   if (err.name === 'ZodError') {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: 'Validation failed',
       details: (err as any).errors,
     });
+    return;
   }
 
   // Generic error handler

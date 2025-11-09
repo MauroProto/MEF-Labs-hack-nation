@@ -1,0 +1,206 @@
+import { FurtherQuestionsGenerator } from "./FurtherQuestionsGenerator";
+import { PostureGenerator } from "./PostureGenerator";
+import { DebaterAgent } from "./DebaterAgent";
+import { JudgeAgent } from "./JudgeAgent";
+import { ReporterAgent } from "./ReporterAgent";
+import {
+  Paper,
+  DebateSession,
+  DebaterArgument,
+  JudgeVerdict,
+  DebateReport,
+  DEFAULT_RUBRIC,
+  Rubric,
+} from "../../types/debate.types";
+
+export interface DebateCoordinatorConfig {
+  rubric?: Rubric;
+}
+
+export class DebateCoordinator {
+  private furtherQuestionsGenerator: FurtherQuestionsGenerator;
+  private postureGenerator: PostureGenerator;
+  private judgeAgent: JudgeAgent;
+  private reporterAgent: ReporterAgent;
+  private rubric: Rubric;
+
+  constructor(config: DebateCoordinatorConfig = {}) {
+    this.furtherQuestionsGenerator = new FurtherQuestionsGenerator();
+    this.postureGenerator = new PostureGenerator();
+    this.judgeAgent = new JudgeAgent();
+    this.reporterAgent = new ReporterAgent();
+    this.rubric = config.rubric || DEFAULT_RUBRIC;
+  }
+
+  /**
+   * Step 1: Generate further questions from the paper
+   */
+  async generateQuestions(paper: Paper): Promise<string[]> {
+    const response = await this.furtherQuestionsGenerator.generate({ paper });
+    return response.questions;
+  }
+
+  /**
+   * Step 2: Generate postures and topics for a selected question
+   */
+  async generatePosturesAndTopics(
+    paper: Paper,
+    question: string,
+    numPostures: number = 3
+  ): Promise<{ postures: string[]; topics: string[] }> {
+    const response = await this.postureGenerator.generate({
+      question,
+      paper,
+      numPostures,
+    });
+    return {
+      postures: response.postures,
+      topics: response.topics,
+    };
+  }
+
+  /**
+   * Step 3: Run the debate with N debaters (parallel)
+   */
+  async runDebate(
+    paper: Paper,
+    question: string,
+    topics: string[],
+    postures: string[]
+  ): Promise<DebaterArgument[]> {
+    // Create debater agents and run them in parallel
+    const debatePromises = postures.map((posture) => {
+      const debater = new DebaterAgent();
+      return debater.debate({
+        posture,
+        question,
+        topics,
+        paper,
+      });
+    });
+
+    const debaterArguments = await Promise.all(debatePromises);
+    return debaterArguments;
+  }
+
+  /**
+   * Step 4: Judge the debate
+   */
+  async judgeDebate(
+    question: string,
+    topics: string[],
+    debaterArguments: DebaterArgument[]
+  ): Promise<JudgeVerdict> {
+    const verdict = await this.judgeAgent.judge({
+      question,
+      topics,
+      arguments: debaterArguments,
+      rubric: this.rubric,
+    });
+    return verdict;
+  }
+
+  /**
+   * Step 5: Generate final report
+   */
+  async generateReport(
+    question: string,
+    topics: string[],
+    postures: string[],
+    debaterArguments: DebaterArgument[],
+    verdict: JudgeVerdict
+  ): Promise<DebateReport> {
+    const report = await this.reporterAgent.generateReport({
+      question,
+      topics,
+      postures,
+      arguments: debaterArguments,
+      verdict,
+    });
+    return report;
+  }
+
+  /**
+   * Complete end-to-end debate flow
+   */
+  async runCompleteDebate(
+    paper: Paper,
+    question: string,
+    numPostures: number = 3,
+    onProgress?: (stage: string, data?: any) => void
+  ): Promise<DebateReport> {
+    try {
+      // Step 1: Generate postures and topics
+      onProgress?.("Generating postures and topics...");
+      const { postures, topics } = await this.generatePosturesAndTopics(
+        paper,
+        question,
+        numPostures
+      );
+      onProgress?.("postures_generated", { postures, topics });
+
+      // Step 2: Run debate
+      onProgress?.("Running debate with " + numPostures + " debaters...");
+      const debaterArguments = await this.runDebate(paper, question, topics, postures);
+      onProgress?.("debate_complete", { arguments: debaterArguments });
+
+      // Step 3: Judge debate
+      onProgress?.("Judging arguments...");
+      const verdict = await this.judgeDebate(question, topics, debaterArguments);
+      onProgress?.("judging_complete", { verdict });
+
+      // Step 4: Generate report
+      onProgress?.("Generating final report...");
+      const report = await this.generateReport(
+        question,
+        topics,
+        postures,
+        debaterArguments,
+        verdict
+      );
+      onProgress?.("report_complete", { report });
+
+      return report;
+    } catch (error) {
+      console.error("Error in debate flow:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Run complete flow starting from paper (including question generation)
+   */
+  async runCompleteDebateWithQuestionGeneration(
+    paper: Paper,
+    questionIndex: number = 0,
+    numPostures: number = 3,
+    onProgress?: (stage: string, data?: any) => void
+  ): Promise<DebateReport> {
+    try {
+      // Step 0: Generate questions
+      onProgress?.("Generating questions from paper...");
+      const questions = await this.generateQuestions(paper);
+      onProgress?.("questions_generated", { questions });
+
+      // Select question
+      const selectedQuestion = questions[questionIndex] || questions[0];
+      if (!selectedQuestion) {
+        throw new Error("No questions generated");
+      }
+
+      onProgress?.("question_selected", { question: selectedQuestion });
+
+      // Run complete debate with selected question
+      return await this.runCompleteDebate(
+        paper,
+        selectedQuestion,
+        numPostures,
+        onProgress
+      );
+    } catch (error) {
+      console.error("Error in complete debate flow:", error);
+      throw error;
+    }
+  }
+}
+
