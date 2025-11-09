@@ -8,13 +8,7 @@ import { NodeType } from './nodeTypes';
 import { PaperUploadNode } from '@/components/nodes/PaperUploadNode';
 import { NoteNode } from '@/components/nodes/NoteNode';
 import { PaperChatNode } from '@/components/nodes/PaperChatNode';
-import { DebateNode } from '@/components/nodes/DebateNode';
 import { MasDebateNode } from '@/components/nodes/MasDebateNode';
-import { ResearcherAgentNode } from '@/components/nodes/ResearcherAgentNode';
-import { CriticAgentNode } from '@/components/nodes/CriticAgentNode';
-import { SynthesizerAgentNode } from '@/components/nodes/SynthesizerAgentNode';
-import { QuestionGeneratorNode } from '@/components/nodes/QuestionGeneratorNode';
-import { CitationTrackerNode } from '@/components/nodes/CitationTrackerNode';
 import { BaseNode } from '@/components/nodes/BaseNode';
 
 export const NODE_COMPONENTS: Record<NodeType, React.ComponentType<any>> = {
@@ -27,12 +21,12 @@ export const NODE_COMPONENTS: Record<NodeType, React.ComponentType<any>> = {
   'web-research': BaseNode, // TODO: Implement WebResearchNode
   'debate': MasDebateNode, // Improved debate system with shared topics
 
-  // Agent nodes (minimal UI)
-  'researcher-agent': ResearcherAgentNode,
-  'critic-agent': CriticAgentNode,
-  'synthesizer-agent': SynthesizerAgentNode,
-  'question-generator': QuestionGeneratorNode,
-  'citation-tracker': CitationTrackerNode,
+  // Agent nodes (placeholder - not implemented)
+  'researcher-agent': BaseNode,
+  'critic-agent': BaseNode,
+  'synthesizer-agent': BaseNode,
+  'question-generator': BaseNode,
+  'citation-tracker': BaseNode,
 
   // Visualization nodes (placeholder)
   'citation-graph': BaseNode,
