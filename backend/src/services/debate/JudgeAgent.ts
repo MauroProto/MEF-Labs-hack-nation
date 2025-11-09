@@ -7,19 +7,9 @@ import {
 
 export class JudgeAgent extends BaseDebateAgent {
   async judge(request: JudgeRequest): Promise<JudgeVerdict> {
-    const { question, topics, arguments: debaterArguments, rubric, factCheck } = request;
+    const { question, topics, arguments: debaterArguments, rubric } = request;
 
     const postures = debaterArguments.map(arg => arg.posture);
-
-    const factCheckInfo = factCheck ? `
-
-### FACT-CHECK RESULTS
-
-The Fact-Checker Agent has verified the factual claims. Use these results to inform your evaluation:
-
-${JSON.stringify(factCheck, null, 2)}
-
-**Important**: Consider factual accuracy when scoring, especially for the "value" criterion. Arguments with verified facts should score higher than those with false or unverifiable claims.` : '';
 
     const systemPrompt = `${this.getSystemPrompt()}
 
@@ -128,7 +118,7 @@ Return a JSON object following this schema:
 
 ### END TASK
 
-Return a valid JSON object following the schema above. Do not add extra commentary.${factCheckInfo}`;
+Return a valid JSON object following the schema above. Do not add extra commentary.`;
 
     const rubricText = rubric
       .map(
