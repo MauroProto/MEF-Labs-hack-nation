@@ -31,6 +31,8 @@ import { SimpleControls } from './SimpleControls';
 import { NODE_COMPONENTS } from '@/lib/nodeComponents';
 import { NODE_CONFIGS, CustomNode } from '@/lib/nodeTypes';
 import { usePaperContextStore } from '@/lib/stores/paperContextStore';
+import { useDebateContextStore } from '@/lib/stores/debateContextStore';
+import { useChatContextStore } from '@/lib/stores/chatContextStore';
 
 const initialNodes: Node[] = [];
 
@@ -43,6 +45,13 @@ function EnhancedCanvasInner() {
   const getPaperForNode = usePaperContextStore((s) => s.getPaperForNode);
   const paperConnections = usePaperContextStore((s) => s.paperConnections);
 
+  // Debate context for mas-debate node connections
+  const connectNodeToDebate = useDebateContextStore((s) => s.connectNodeToDebate);
+  const getDebateForNode = useDebateContextStore((s) => s.getDebateForNode);
+
+  // Chat context for chat-to-chat connections
+  const connectChatToChat = useChatContextStore((s) => s.connectChatToChat);
+
   // MiniMap visibility state
   const [showMiniMap, setShowMiniMap] = useState(true);
 
@@ -51,9 +60,18 @@ function EnhancedCanvasInner() {
 
   // Define custom node types
   const nodeTypes: NodeTypes = useMemo(() => NODE_COMPONENTS, []);
+  const defaultViewport = useMemo(() => ({ x: 0, y: 0, zoom: 1 }), []);
+  const translateExtent = useMemo(() => [[-2000, -2000], [4000, 4000]] as [[number, number], [number, number]], []);
 
   // Auto-focus the canvas container on mount to enable keyboard shortcuts
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const handleFixedUIWheel = useCallback((event: React.WheelEvent) => {
+    event.stopPropagation();
+    if (event.ctrlKey) event.preventDefault();
+  }, []);
+  const handleFixedUIPointerDown = useCallback((event: React.PointerEvent) => {
+    event.stopPropagation();
+  }, []);
 
   useEffect(() => {
     // Focus the container when component mounts
@@ -72,9 +90,10 @@ function EnhancedCanvasInner() {
       } as Edge;
       setEdges((eds) => addEdge(newEdge, eds));
 
-      // If a paper-upload node connects to another node, attach its paper to the target node
       const sourceNode = nodes.find((n) => n.id === params.source);
       const targetNode = nodes.find((n) => n.id === params.target);
+
+      // If a paper-upload node connects to another node, attach its paper to the target node
       if (sourceNode?.type === 'paper-upload' && params.target) {
         const paper = getPaperForNode(sourceNode.id);
         const pid = (paper && paper.id) || ((sourceNode.data as any)?.lastPaperId as string | undefined);
@@ -84,8 +103,41 @@ function EnhancedCanvasInner() {
         const pid = (paper && paper.id) || ((targetNode.data as any)?.lastPaperId as string | undefined);
         if (pid) connectNodeToPaper(params.source, pid);
       }
+
+      // If a mas-debate node connects to another node (especially paper-chat), attach debate context
+      if (sourceNode?.type === 'mas-debate' && params.target) {
+        const debate = getDebateForNode(sourceNode.id);
+        if (debate) {
+          connectNodeToDebate(params.target, sourceNode.id);
+          console.log(`[EnhancedCanvas] Connected debate ${sourceNode.id} → ${params.target}`);
+        }
+      } else if (targetNode?.type === 'mas-debate' && params.source) {
+        const debate = getDebateForNode(targetNode.id);
+        if (debate) {
+          connectNodeToDebate(params.source, targetNode.id);
+          console.log(`[EnhancedCanvas] Connected debate ${targetNode.id} → ${params.source}`);
+        }
+      }
+
+      // If a paper-chat node connects to another paper-chat node, establish chat context connection
+      if (sourceNode?.type === 'paper-chat' && targetNode?.type === 'paper-chat') {
+        connectChatToChat(params.source, params.target);
+        console.log(`[EnhancedCanvas] Connected chat ${params.source} → ${params.target}`);
+      }
+
+      // If a paper-chat or web-research connects to another paper-chat or web-research, establish context connection
+      const contextNodeTypes = ['paper-chat', 'web-research'];
+      if (
+        sourceNode?.type &&
+        targetNode?.type &&
+        contextNodeTypes.includes(sourceNode.type) &&
+        contextNodeTypes.includes(targetNode.type)
+      ) {
+        connectChatToChat(params.source, params.target);
+        console.log(`[EnhancedCanvas] Connected context ${params.source} (${sourceNode.type}) → ${params.target} (${targetNode.type})`);
+      }
     },
-    [setEdges, nodes, connectNodeToPaper, getPaperForNode]
+    [setEdges, nodes, connectNodeToPaper, getPaperForNode, connectNodeToDebate, getDebateForNode, connectChatToChat]
   );
 
   // Handle drop from toolbar
@@ -234,6 +286,9 @@ function EnhancedCanvasInner() {
         panOnScroll
         panOnDrag={false}
         selectionOnDrag={false}
+        onlyRenderVisibleElements
+        defaultViewport={defaultViewport}
+        translateExtent={translateExtent}
         proOptions={{ hideAttribution: true }}
         elevateNodesOnSelect={false}
         nodesDraggable
@@ -246,12 +301,17 @@ function EnhancedCanvasInner() {
         <Background color="#e5e7eb" gap={16} size={0.5} />
 
         {/* Controls - moved to top-left */}
-        <Controls
-          showZoom={true}
-          showFitView
-          showInteractive={false}
-          position="top-left"
-        />
+        <div
+          onWheel={handleFixedUIWheel}
+          onPointerDown={handleFixedUIPointerDown}
+        >
+          <Controls
+            showZoom={true}
+            showFitView
+            showInteractive={false}
+            position="top-left"
+          />
+        </div>
 
         {/* MiniMap with Toggle Button - moved to bottom-right */}
         {showMiniMap ? (
@@ -316,12 +376,22 @@ function EnhancedCanvasInner() {
 
         {/* Bottom Toolbar - Node Palette */}
         <Panel position="bottom-center">
-          <EnhancedToolbar onAddNode={addNode} />
+          <div
+            onWheel={handleFixedUIWheel}
+            onPointerDown={handleFixedUIPointerDown}
+          >
+            <EnhancedToolbar onAddNode={addNode} />
+          </div>
         </Panel>
 
         {/* Right Info Panel */}
         <Panel position="top-right">
-          <SimpleControls />
+          <div
+            onWheel={handleFixedUIWheel}
+            onPointerDown={handleFixedUIPointerDown}
+          >
+            <SimpleControls />
+          </div>
         </Panel>
       </ReactFlow>
     </div>

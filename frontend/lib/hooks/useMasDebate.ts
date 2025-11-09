@@ -49,6 +49,18 @@ export type DebateHistoryEntry = {
   report: DebateReport;
 };
 
+export type LiveStreamMessage = {
+  type: 'debater' | 'question' | 'response';
+  questionIndex: number;  // Which question this message belongs to
+  debaterIndex?: number;
+  posture?: string;
+  fromDebater?: string;
+  toDebater?: string;
+  roundNumber?: number;
+  text: string;
+  isComplete: boolean;
+};
+
 export type DebateState = {
   status: DebateStatus;
   progress: string;
@@ -63,6 +75,9 @@ export type DebateState = {
 
   // Per-debater progress tracking
   debaterProgress: DebaterProgress[];
+
+  // Live streaming messages (real-time text accumulation)
+  liveMessages: LiveStreamMessage[];
 
   // Debate results (current debate - single question)
   arguments?: DebaterArgument[];
@@ -86,6 +101,7 @@ export function useMasDebate() {
     status: 'idle',
     progress: '',
     debaterProgress: [],
+    liveMessages: [],
     history: [],
   });
 
@@ -365,6 +381,7 @@ export function useMasDebate() {
       status: 'idle',
       progress: '',
       debaterProgress: [],
+      liveMessages: [],  // Clear live messages on reset
       history: Array.isArray(prev.history) ? prev.history : [], // Preserve history
     }));
     setLoading(false);
@@ -426,7 +443,33 @@ export function useMasDebate() {
                 if (newProgress[event.data.debaterIndex]) {
                   newProgress[event.data.debaterIndex].status = 'running';
                 }
-                return { ...prev, debaterProgress: newProgress };
+                // Create new live message for this debater
+                const newMessage: LiveStreamMessage = {
+                  type: 'debater',
+                  questionIndex: prev.currentQuestionIndex ?? 0,
+                  debaterIndex: event.data.debaterIndex,
+                  posture: event.data.posture,
+                  text: '',
+                  isComplete: false,
+                };
+                return { ...prev, debaterProgress: newProgress, liveMessages: [...prev.liveMessages, newMessage] };
+              });
+            }
+
+            // Debater streaming delta
+            if (event.stage === 'debater_stream_delta') {
+              setDebateState((prev) => {
+                const newMessages = [...prev.liveMessages];
+                const messageIndex = newMessages.findIndex(
+                  (m) => m.type === 'debater' && m.debaterIndex === event.data.debaterIndex && !m.isComplete
+                );
+                if (messageIndex !== -1) {
+                  newMessages[messageIndex] = {
+                    ...newMessages[messageIndex],
+                    text: newMessages[messageIndex].text + event.data.delta,
+                  };
+                }
+                return { ...prev, liveMessages: newMessages };
               });
             }
 
@@ -441,7 +484,15 @@ export function useMasDebate() {
                     argument: event.data.argument,
                   };
                 }
-                return { ...prev, debaterProgress: newProgress };
+                // Mark live message as complete
+                const newMessages = [...prev.liveMessages];
+                const messageIndex = newMessages.findIndex(
+                  (m) => m.type === 'debater' && m.debaterIndex === event.data.debaterIndex && !m.isComplete
+                );
+                if (messageIndex !== -1) {
+                  newMessages[messageIndex] = { ...newMessages[messageIndex], isComplete: true };
+                }
+                return { ...prev, debaterProgress: newProgress, liveMessages: newMessages };
               });
             }
 
@@ -462,16 +513,117 @@ export function useMasDebate() {
               }));
             }
 
+            // Exchange question started
+            if (event.stage === 'exchange_question') {
+              setDebateState((prev) => {
+                const newMessage: LiveStreamMessage = {
+                  type: 'question',
+                  questionIndex: prev.currentQuestionIndex ?? 0,
+                  fromDebater: event.data.fromDebater,
+                  toDebater: event.data.toDebater,
+                  roundNumber: event.data.roundNumber,
+                  text: '',
+                  isComplete: false,
+                };
+                return { ...prev, liveMessages: [...prev.liveMessages, newMessage] };
+              });
+            }
+
+            // Question streaming delta
+            if (event.stage === 'question_stream_delta') {
+              setDebateState((prev) => {
+                const newMessages = [...prev.liveMessages];
+                const messageIndex = newMessages.findIndex(
+                  (m) => m.type === 'question' &&
+                         m.fromDebater === event.data.fromDebater &&
+                         m.roundNumber === event.data.roundNumber &&
+                         !m.isComplete
+                );
+                if (messageIndex !== -1) {
+                  newMessages[messageIndex] = {
+                    ...newMessages[messageIndex],
+                    text: newMessages[messageIndex].text + event.data.delta,
+                  };
+                }
+                return { ...prev, liveMessages: newMessages };
+              });
+            }
+
+            // Exchange response started
+            if (event.stage === 'exchange_response') {
+              setDebateState((prev) => {
+                // Find the question that this response answers
+                // event.data.fromDebater is who is RESPONDING (the responder)
+                // We need to find the question asked TO this responder
+                const newMessages = [...prev.liveMessages];
+                const questionIndex = newMessages.findIndex(
+                  (m) => m.type === 'question' &&
+                         m.toDebater === event.data.fromDebater &&  // Question TO the responder
+                         m.roundNumber === event.data.roundNumber &&
+                         !m.isComplete
+                );
+
+                let questionerPosture: string | undefined;
+                if (questionIndex !== -1) {
+                  // Mark question as complete and get who asked it
+                  questionerPosture = newMessages[questionIndex].fromDebater;
+                  newMessages[questionIndex] = { ...newMessages[questionIndex], isComplete: true };
+                }
+
+                // Create response message
+                const responseMessage: LiveStreamMessage = {
+                  type: 'response',
+                  questionIndex: prev.currentQuestionIndex ?? 0,
+                  fromDebater: questionerPosture,  // Who ASKED the question
+                  toDebater: event.data.fromDebater,  // Who is RESPONDING
+                  roundNumber: event.data.roundNumber,
+                  text: '',
+                  isComplete: false,
+                };
+                return { ...prev, liveMessages: [...newMessages, responseMessage] };
+              });
+            }
+
+            // Response streaming delta
+            if (event.stage === 'response_stream_delta') {
+              setDebateState((prev) => {
+                const newMessages = [...prev.liveMessages];
+                // event.data.fromDebater is who is RESPONDING
+                // Response messages have toDebater = responder
+                const messageIndex = newMessages.findIndex(
+                  (m) => m.type === 'response' &&
+                         m.toDebater === event.data.fromDebater &&  // Match on who is responding
+                         m.roundNumber === event.data.roundNumber &&
+                         !m.isComplete
+                );
+                if (messageIndex !== -1) {
+                  newMessages[messageIndex] = {
+                    ...newMessages[messageIndex],
+                    text: newMessages[messageIndex].text + event.data.delta,
+                  };
+                }
+                return { ...prev, liveMessages: newMessages };
+              });
+            }
+
             // Round complete - update current rounds
             if (event.stage === 'round_complete') {
               setDebateState((prev) => {
                 const existingRounds = prev.currentRounds || [];
+                // Mark all responses in this round as complete
+                const newMessages = [...prev.liveMessages];
+                newMessages.forEach((m, i) => {
+                  if (m.roundNumber === event.data.roundNumber && !m.isComplete) {
+                    newMessages[i] = { ...m, isComplete: true };
+                  }
+                });
                 return {
                   ...prev,
                   currentRounds: [...existingRounds, {
                     roundNumber: event.data.roundNumber,
                     exchanges: event.data.exchanges,
                   }],
+                  liveMessages: newMessages,
                   progress: `Round ${event.data.roundNumber} complete`,
                 };
               });

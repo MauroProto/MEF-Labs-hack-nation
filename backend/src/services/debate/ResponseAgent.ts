@@ -29,24 +29,37 @@ export class ResponseAgent extends BaseDebateAgent {
   /**
    * Generate a response to a cross-examination question
    */
-  async generateResponse(request: ResponseRequest): Promise<ResponseResult> {
+  async generateResponse(request: ResponseRequest, onStream?: (delta: string) => void): Promise<ResponseResult> {
     const systemPrompt = this.buildSystemPrompt(request);
     const userPrompt = this.buildUserPrompt(request);
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 800,
-    });
+    const messages = [
+      { role: 'user' as const, content: userPrompt },
+    ];
 
-    const responseText = completion.choices[0]?.message?.content || '';
-    const extracted = this.extractJsonFromResponse(completion);
+    if (onStream) {
+      // Use streaming
+      const extracted = await this.callOpenAIWithStreamingJson<ResponseResult>(
+        messages,
+        systemPrompt,
+        onStream
+      );
+      return extracted;
+    } else {
+      // Non-streaming (original behavior)
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 800,
+      });
 
-    return extracted as ResponseResult;
+      const extracted = this.extractJsonFromResponse(completion);
+      return extracted as ResponseResult;
+    }
   }
 
   private buildSystemPrompt(request: ResponseRequest): string {

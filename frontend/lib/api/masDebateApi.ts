@@ -201,6 +201,9 @@ export type DebateProgressEvent =
   | { stage: 'Generating questions from paper...'; data?: any }
   | { stage: 'questions_generated'; data: { questions: string[] } }
   | { stage: 'question_selected'; data: { question: string } }
+  | { stage: 'debater_stream_delta'; data: { debaterIndex: number; posture: string; delta: string } }
+  | { stage: 'question_stream_delta'; data: { roundNumber: number; fromDebater: string; toDebater: string; delta: string } }
+  | { stage: 'response_stream_delta'; data: { roundNumber: number; fromDebater: string; toDebater: string; delta: string } }
   | { stage: 'question_debate_started'; data: { questionIndex: number; totalQuestions: number; question: string } }
   | { stage: 'question_debate_complete'; data: { questionIndex: number; result: QuestionDebateResult } };
 

@@ -27,24 +27,37 @@ export class QuestionerAgent extends BaseDebateAgent {
   /**
    * Generate a challenging cross-examination question from one debater to another
    */
-  async generateQuestion(request: QuestionerRequest): Promise<QuestionerResponse> {
+  async generateQuestion(request: QuestionerRequest, onStream?: (delta: string) => void): Promise<QuestionerResponse> {
     const systemPrompt = this.buildSystemPrompt(request);
     const userPrompt = this.buildUserPrompt(request);
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-    });
+    const messages = [
+      { role: 'user' as const, content: userPrompt },
+    ];
 
-    const responseText = completion.choices[0]?.message?.content || '';
-    const extracted = this.extractJsonFromResponse(completion);
+    if (onStream) {
+      // Use streaming
+      const extracted = await this.callOpenAIWithStreamingJson<QuestionerResponse>(
+        messages,
+        systemPrompt,
+        onStream
+      );
+      return extracted;
+    } else {
+      // Non-streaming (original behavior)
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
 
-    return extracted as QuestionerResponse;
+      const extracted = this.extractJsonFromResponse(completion);
+      return extracted as QuestionerResponse;
+    }
   }
 
   private buildSystemPrompt(request: QuestionerRequest): string {

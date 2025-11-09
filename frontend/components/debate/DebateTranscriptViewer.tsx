@@ -156,6 +156,42 @@ export function DebateTranscriptViewer({ report, onClose }: DebateTranscriptView
                     </div>
                   </div>
 
+                  {/* Initial Arguments */}
+                  {result.initialArguments && result.initialArguments.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Initial Arguments</h4>
+                      <div className="space-y-3">
+                        {result.initialArguments.map((arg, aIndex) => (
+                          <div key={aIndex} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                            <div className="font-medium text-sm text-gray-900 mb-2">
+                              {result.postures[aIndex]}
+                            </div>
+                            {arg.perTopic && arg.perTopic.map((topic: any, tIndex: number) => (
+                              <div key={tIndex} className="mb-3 last:mb-0">
+                                <div className="text-xs font-semibold text-gray-700 mb-1">{topic.topic}</div>
+                                {topic.claim && (
+                                  <div className="text-xs text-gray-600 mb-1">
+                                    <span className="font-medium">Claim:</span> {topic.claim}
+                                  </div>
+                                )}
+                                {topic.reasoning && (
+                                  <div className="text-xs text-gray-600">
+                                    {topic.reasoning}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {arg.overallPosition && (
+                              <div className="mt-2 pt-2 border-t border-gray-300">
+                                <div className="text-xs text-gray-700 italic">{arg.overallPosition}</div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Debate Rounds */}
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">Debate Rounds</h4>

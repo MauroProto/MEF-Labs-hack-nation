@@ -88,12 +88,23 @@ export class DebateCoordinator {
       });
 
       try {
+        // Create streaming callback for this debater
+        const onStream = onProgress
+          ? (delta: string) => {
+              onProgress("debater_stream_delta", {
+                debaterIndex: index,
+                posture,
+                delta,
+              });
+            }
+          : undefined;
+
         const argument = await debater.debate({
           posture,
           question,
           topics,
           paper,
-        });
+        }, onStream);
 
         // Emit debater completed event with the argument
         onProgress?.("debater_complete", {
@@ -289,12 +300,23 @@ export class DebateCoordinator {
           toDebater: responderPosture,
         });
 
+        const onQuestionStream = onProgress
+          ? (delta: string) => {
+              onProgress("question_stream_delta", {
+                roundNumber: roundNum,
+                fromDebater: questionerPosture,
+                toDebater: responderPosture,
+                delta,
+              });
+            }
+          : undefined;
+
         const { question: crossQuestion } = await questionerAgent.generateQuestion({
           questionerPosture,
           targetPosture: responderPosture,
           targetArgument: responderArgument,
           mainQuestion: question,
-        });
+        }, onQuestionStream);
 
         // Generate response
         onProgress?.("exchange_response", {
@@ -303,6 +325,17 @@ export class DebateCoordinator {
           question: crossQuestion,
         });
 
+        const onResponseStream = onProgress
+          ? (delta: string) => {
+              onProgress("response_stream_delta", {
+                roundNumber: roundNum,
+                fromDebater: responderPosture,
+                toDebater: questionerPosture,
+                delta,
+              });
+            }
+          : undefined;
+
         const { response } = await responseAgent.generateResponse({
           responderPosture,
           responderArgument,
@@ -310,7 +343,7 @@ export class DebateCoordinator {
           question: crossQuestion,
           mainQuestion: question,
           paper,
-        });
+        }, onResponseStream);
 
         const exchange: DebateExchange = {
           fromDebater: questionerPosture,

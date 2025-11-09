@@ -6,10 +6,11 @@
 
 'use client';
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { BaseNode } from './BaseNode';
-import { Search, Square, Loader2 } from 'lucide-react';
+import { Search, Square, Loader2, Link2 } from 'lucide-react';
 import { usePaperContextStore } from '@/lib/stores/paperContextStore';
+import { useChatContextStore } from '@/lib/stores/chatContextStore';
 import { useStore } from '@xyflow/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -31,6 +32,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { getPaper } = usePaperContextStore();
+  const { updateConversation, getUpstreamChats } = useChatContextStore();
   const edges = useStore((s) => s.edges);
   const nodes = useStore((s) => s.nodes);
 
@@ -48,8 +50,36 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
     return null;
   }, [edges, nodes, id, getPaper]);
 
+  // Get upstream chats for context
+  const upstreamChats = getUpstreamChats(id);
+
+  // Update conversation store when we have output (so other nodes can use this research as context)
+  useEffect(() => {
+    if (output && query) {
+      const messages = [
+        {
+          id: `research-query-${Date.now()}`,
+          role: 'user' as const,
+          content: query,
+          timestamp: new Date(),
+        },
+        {
+          id: `research-result-${Date.now()}`,
+          role: 'assistant' as const,
+          content: output,
+          timestamp: new Date(),
+        },
+      ];
+      updateConversation(
+        id,
+        messages,
+        connectedPaper ? { paperId: connectedPaper.id, title: connectedPaper.title } : undefined
+      );
+    }
+  }, [output, query, id, connectedPaper, updateConversation]);
+
   const handleResearch = useCallback(async () => {
-    if (!query.trim() || !connectedPaper) return;
+    if (!query.trim()) return;
 
     setStatus('working');
     setOutput('');
@@ -75,6 +105,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
                 metadata: connectedPaper.metadata,
               }
             : null,
+          chatContext: upstreamChats,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -160,7 +191,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
         setProgressMessage('');
       }
     }
-  }, [query, data]);
+  }, [query, data, connectedPaper, upstreamChats]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -175,18 +206,24 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
   return (
     <BaseNode id={id} data={data} selected={selected}>
       <div className="flex flex-col h-full">
-        {/* Header minimal: status + paper chip */}
+        {/* Header minimal: status + paper chip + upstream chats indicator */}
         <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b border-gray-100">
           <div className="flex items-center gap-2 min-w-0">
             <span
-              className={connectedPaper ? 'h-1.5 w-1.5 rounded-full bg-emerald-500' : 'h-1.5 w-1.5 rounded-full bg-amber-500'}
+              className={connectedPaper || upstreamChats.length > 0 ? 'h-1.5 w-1.5 rounded-full bg-emerald-500' : 'h-1.5 w-1.5 rounded-full bg-amber-500'}
             />
             {connectedPaper ? (
-              <div className="truncate max-w-[240px] rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700">
+              <div className="truncate max-w-[180px] rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700">
                 <span className="font-medium text-gray-900">Paper:</span> {connectedPaper.title}
               </div>
             ) : (
-              <div className="text-[11px] text-gray-500">Conecta un paper para investigar en torno a él</div>
+              <div className="text-[11px] text-gray-500">Búsqueda web general</div>
+            )}
+            {upstreamChats.length > 0 && (
+              <div className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+                <Link2 className="h-2.5 w-2.5" />
+                <span>{upstreamChats.length} chat{upstreamChats.length > 1 ? 's' : ''}</span>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2 text-[10px] text-gray-400">
@@ -224,7 +261,13 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
                   <p className="mt-2 text-gray-500">{progressMessage || 'Investigando…'}</p>
                 </>
               ) : (
-                <p className="text-gray-500">Ingresa una consulta para investigar en torno al paper</p>
+                <p className="text-gray-500">
+                  {connectedPaper
+                    ? 'Ingresa una consulta para investigar en torno al paper'
+                    : upstreamChats.length > 0
+                    ? 'Investiga basándote en conversaciones previas'
+                    : 'Realiza una búsqueda web profunda'}
+                </p>
               )}
             </div>
           )}
@@ -241,14 +284,14 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
                   setQuery(e.target.value);
                   data.query = e.target.value;
                 }}
-                placeholder={connectedPaper ? 'Escribe tu búsqueda…' : 'Conecta un paper para investigar'}
-                disabled={status === 'working' || !connectedPaper}
+                placeholder={connectedPaper || upstreamChats.length > 0 ? 'Escribe tu búsqueda…' : 'Escribe tu búsqueda web…'}
+                disabled={status === 'working'}
                 className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400"
               />
               {status !== 'working' && (
                 <button
                   onClick={handleResearch}
-                  disabled={!query.trim() || !connectedPaper}
+                  disabled={!query.trim()}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:bg-gray-300"
                   title="Investigar"
                 >

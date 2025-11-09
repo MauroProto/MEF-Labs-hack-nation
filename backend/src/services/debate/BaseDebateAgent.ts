@@ -97,5 +97,88 @@ export abstract class BaseDebateAgent {
     const response = await this.callOpenAI(messages, systemPrompt, tools);
     return this.extractJsonFromResponse(response) as T;
   }
+
+  /**
+   * Call OpenAI with streaming support
+   * @param messages - Chat messages
+   * @param systemPrompt - System prompt override
+   * @param onStream - Callback for each text delta
+   * @returns Full accumulated text
+   */
+  protected async callOpenAIWithStreaming(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    systemPrompt?: string,
+    onStream?: (delta: string) => void
+  ): Promise<string> {
+    const allMessages: OpenAI.ChatCompletionMessageParam[] = [
+      {
+        role: "system",
+        content: systemPrompt || this.getSystemPrompt(),
+      },
+      ...messages,
+    ];
+
+    const stream = await this.client.chat.completions.create({
+      model: this.model,
+      max_tokens: this.maxTokens,
+      temperature: this.temperature,
+      messages: allMessages,
+      stream: true,
+    });
+
+    let fullText = '';
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content || '';
+      if (delta) {
+        fullText += delta;
+        if (onStream) {
+          onStream(delta);
+        }
+      }
+    }
+
+    return fullText;
+  }
+
+  /**
+   * Call OpenAI with streaming and parse final JSON response
+   * @param messages - Chat messages
+   * @param systemPrompt - System prompt override
+   * @param onStream - Callback for each text delta
+   * @returns Parsed JSON response
+   */
+  protected async callOpenAIWithStreamingJson<T>(
+    messages: OpenAI.ChatCompletionMessageParam[],
+    systemPrompt?: string,
+    onStream?: (delta: string) => void
+  ): Promise<T> {
+    const fullText = await this.callOpenAIWithStreaming(messages, systemPrompt, onStream);
+
+    // Parse the accumulated text as JSON
+    const codeBlockMatch = fullText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
+      try {
+        return JSON.parse(codeBlockMatch[1]) as T;
+      } catch (e) {
+        // Try next method
+      }
+    }
+
+    try {
+      return JSON.parse(fullText) as T;
+    } catch (e) {
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[0]) as T;
+        } catch (e2) {
+          throw new Error(`Failed to parse JSON from streamed response: ${fullText.slice(0, 200)}`);
+        }
+      }
+    }
+
+    throw new Error("No valid JSON found in streamed response");
+  }
 }
 

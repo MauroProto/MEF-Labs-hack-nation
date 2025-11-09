@@ -12,7 +12,7 @@ import { webSearch } from "./webSearchService";
 export class DebaterAgent extends BaseDebateAgent {
   private paper!: Paper;
 
-  async debate(request: DebaterRequest): Promise<DebaterArgument> {
+  async debate(request: DebaterRequest, onStream?: (delta: string) => void): Promise<DebaterArgument> {
     const { posture, question, topics, paper } = request;
     this.paper = paper;
 
@@ -172,20 +172,67 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
     while (iterations < maxIterations) {
       iterations++;
 
-      const response = await this.callOpenAI(messages, systemPrompt, tools);
-      const message = response.choices[0]?.message;
+      // Use streaming if available and no tool calls expected
+      const isLikelyFinalResponse = iterations > 1; // After first round, likely final
+
+      let response: OpenAI.ChatCompletion | null = null;
+      let streamedText: string | null = null;
+
+      if (onStream && isLikelyFinalResponse) {
+        // Try streaming for final response
+        try {
+          streamedText = await this.callOpenAIWithStreaming(messages, systemPrompt, onStream);
+        } catch (e) {
+          // Fallback to non-streaming
+          response = await this.callOpenAI(messages, systemPrompt, tools);
+        }
+      } else {
+        response = await this.callOpenAI(messages, systemPrompt, tools);
+      }
+
+      // Parse response
+      const message = response ? response.choices[0]?.message : null;
+      const toolCalls = message?.tool_calls;
+
+      // If we streamed, parse the text
+      if (streamedText && !toolCalls) {
+        try {
+          // Parse streamed JSON
+          const codeBlockMatch = streamedText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          if (codeBlockMatch) {
+            finalResponse = JSON.parse(codeBlockMatch[1]) as DebaterArgument;
+          } else {
+            const jsonMatch = streamedText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              finalResponse = JSON.parse(jsonMatch[0]) as DebaterArgument;
+            } else {
+              finalResponse = JSON.parse(streamedText) as DebaterArgument;
+            }
+          }
+          break;
+        } catch (e) {
+          // Failed to parse streamed JSON, continue loop
+          messages.push({
+            role: "assistant",
+            content: streamedText,
+          });
+          messages.push({
+            role: "user",
+            content: "Please provide your complete argument in the required JSON format.",
+          });
+          continue;
+        }
+      }
 
       if (!message) {
         throw new Error("No message in response");
       }
 
       // Check if we have tool calls
-      const toolCalls = message.tool_calls;
-
       if (!toolCalls || toolCalls.length === 0) {
         // No more tool calls, extract final answer
         try {
-          finalResponse = this.extractJsonFromResponse(response) as DebaterArgument;
+          finalResponse = this.extractJsonFromResponse(response!) as DebaterArgument;
           break;
         } catch (e) {
           // If we can't extract JSON, add assistant message and ask for JSON

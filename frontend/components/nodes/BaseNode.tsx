@@ -83,7 +83,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
   return (
     <div
       className={cn(
-        'group rounded-lg border-[3px] bg-white text-gray-900',
+        'group flex flex-col rounded-lg border-[3px] box-border bg-white text-gray-900',
         selected && !locked && 'border-blue-500 ring-1 ring-blue-200',
         !selected && !locked && 'border-gray-200',
         locked && 'border-orange-500 ring-2 ring-orange-200 nopan'
@@ -160,7 +160,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
       {/* Header - Draggable area */}
       <div
         className={cn(
-          "flex items-center justify-between px-2.5 py-1.5 bg-white border-b border-gray-200 rounded-t-lg",
+          "flex items-center justify-between px-2.5 py-1.5 bg-white border-b border-gray-200 rounded-t-lg shrink-0",
           !locked && "cursor-grab active:cursor-grabbing"
         )}
         data-drag-handle
@@ -194,15 +194,11 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
       {/* Content - nopan prevents canvas panning when scrolling */}
       <div
         className={cn(
-          'nopan',
+          'nopan flex-1 min-h-0',
           locked && 'nodrag',
           locked ? 'overflow-auto' : 'overflow-hidden'
         )}
         style={{
-          height: 'calc(100% - 36px)',
-          minHeight: `calc(${config.defaultHeight}px - 36px)`,
-          padding: 0,
-          margin: 0,
           touchAction: locked ? 'pan-y' : undefined
         }}
         onMouseDownCapture={locked ? (e) => e.stopPropagation() : undefined}

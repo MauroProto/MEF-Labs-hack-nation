@@ -13,7 +13,7 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, paperContext } = await request.json();
+    const { messages, paperContext, debateContext, chatContext } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -22,21 +22,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build system message with paper context
-    const systemMessage = {
-      role: 'system' as const,
-      content: paperContext
-        ? `You are a helpful research assistant analyzing the following paper:
+    // Build system message with paper context and/or debate context and/or chat context
+    let systemContent = 'You are a helpful research assistant.';
+
+    // Add paper context if available
+    if (paperContext) {
+      systemContent = `You are a helpful research assistant analyzing the following paper:
 
 Title: ${paperContext.title}
 Authors: ${paperContext.authors?.map((a: any) => a.name).join(', ') || 'Unknown'}
 ${paperContext.abstract ? `Abstract: ${paperContext.abstract}` : ''}
 
 Full text excerpt:
-${paperContext.fullText?.substring(0, 3000) || ''}
+${paperContext.fullText?.substring(0, 3000) || ''}`;
+    }
 
-Please answer questions about this paper accurately and helpfully. Format your responses in markdown.`
-        : 'You are a helpful research assistant. Format your responses in markdown.',
+    // Add debate context if available (takes priority over paper context for specificity)
+    if (debateContext) {
+      systemContent = `You are a helpful research assistant with access to a complete multi-agent debate about a research paper.
+
+The debate covered the following questions:
+${debateContext.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')}
+
+## Full Debate Transcript
+
+${debateContext.markdown}
+
+---
+
+Use this debate transcript to answer questions. You have access to:
+- All arguments from multiple AI agents with different perspectives
+- Q&A rounds between the debaters
+- Judge evaluations and scores
+- Final rankings and consensus findings
+
+Provide comprehensive answers based on the debate content. Reference specific arguments, counterarguments, and evidence from the transcript when relevant.`;
+    }
+
+    // Add chat context from upstream conversations if available
+    if (chatContext && Array.isArray(chatContext) && chatContext.length > 0) {
+      systemContent += `\n\n## Previous Conversations Context
+
+You have access to ${chatContext.length} previous conversation${chatContext.length > 1 ? 's' : ''} that provide relevant context. Use this information to build upon previous discussions and provide more informed responses.
+
+`;
+
+      // Add each upstream conversation
+      chatContext.forEach((conv: any, index: number) => {
+        systemContent += `### Previous Conversation ${index + 1}${conv.paperContext ? ` (about: ${conv.paperContext.title})` : ''}\n`;
+
+        // Include the last few messages from each conversation (limit to avoid token overflow)
+        const recentMessages = conv.messages.slice(-6); // Last 6 messages (3 exchanges)
+        recentMessages.forEach((msg: any) => {
+          const role = msg.role === 'user' ? 'User' : 'Assistant';
+          const content = msg.content.substring(0, 500); // Limit message length
+          systemContent += `**${role}:** ${content}${msg.content.length > 500 ? '...' : ''}\n\n`;
+        });
+
+        systemContent += '\n';
+      });
+    }
+
+    systemContent += '\n\nPlease answer questions accurately and helpfully, building upon the context provided. Format your responses in markdown.';
+
+    const systemMessage = {
+      role: 'system' as const,
+      content: systemContent,
     };
 
     // Call OpenAI with streaming enabled

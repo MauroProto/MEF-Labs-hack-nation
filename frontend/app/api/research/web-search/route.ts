@@ -7,7 +7,7 @@ const openai = new OpenAI({
 });
 
 export async function POST(request: NextRequest) {
-  const { query, paperContext, paperId } = await request.json();
+  const { query, paperContext, paperId, chatContext } = await request.json();
 
   if (!query) {
     return new Response(
@@ -48,7 +48,27 @@ export async function POST(request: NextRequest) {
           console.warn('[web-search] Failed to attach paper context:', err);
         }
 
-        const researchPrompt = `User query: ${query}\n\nPrimary Paper Context${contextTitle ? ` ("${contextTitle}")` : ''}:\n${contextText || '[No paper context provided]'}\n\nInstructions:\n- Perform web research that is strictly relevant to the paper's domain and the user query.\n- Prefer sources that corroborate, extend, critique, or contextualize the paper.\n- Include recent, authoritative sources with inline links.\n- Extract concrete facts, statistics, methodologies, and contrasting viewpoints.\n- Explain how each finding relates back to the paper.\n- Output in markdown with clear headings (##, ###), bullet points and inline links.`;
+        // Build chat context section
+        let chatContextText = '';
+        if (chatContext && Array.isArray(chatContext) && chatContext.length > 0) {
+          chatContextText = `\n\n## Previous Conversations Context\n\nYou have access to ${chatContext.length} previous conversation${chatContext.length > 1 ? 's' : ''} that provide relevant context:\n\n`;
+
+          chatContext.forEach((conv: any, index: number) => {
+            chatContextText += `### Previous Conversation ${index + 1}${conv.paperContext ? ` (about: ${conv.paperContext.title})` : ''}\n`;
+
+            // Include recent messages (limit to avoid token overflow)
+            const recentMessages = conv.messages.slice(-4); // Last 4 messages (2 exchanges)
+            recentMessages.forEach((msg: any) => {
+              const role = msg.role === 'user' ? 'User' : 'Assistant';
+              const content = msg.content.substring(0, 400); // Limit message length
+              chatContextText += `**${role}:** ${content}${msg.content.length > 400 ? '...' : ''}\n\n`;
+            });
+
+            chatContextText += '\n';
+          });
+        }
+
+        const researchPrompt = `User query: ${query}\n\nPrimary Paper Context${contextTitle ? ` ("${contextTitle}")` : ''}:\n${contextText || '[No paper context provided]'}${chatContextText}\n\nInstructions:\n- Perform web research that is strictly relevant to the ${contextText ? 'paper\'s domain and' : ''} user query${chatContextText ? ' and previous conversations' : ''}.\n${contextText ? '- Prefer sources that corroborate, extend, critique, or contextualize the paper.\n' : ''}${chatContextText ? '- Build upon insights from previous conversations.\n' : ''}- Include recent, authoritative sources with inline links.\n- Extract concrete facts, statistics, methodologies, and contrasting viewpoints.\n${contextText ? '- Explain how each finding relates back to the paper.\n' : ''}- Output in markdown with clear headings (##, ###), bullet points and inline links.`;
 
         const completion = await openai.responses.create({
           model: 'o4-mini-deep-research-2025-06-26',
