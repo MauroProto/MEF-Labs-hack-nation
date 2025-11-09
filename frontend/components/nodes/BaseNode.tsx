@@ -51,11 +51,17 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border bg-white text-gray-900 h-full w-full',
+        'rounded-lg border bg-white text-gray-900',
         selected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200',
         locked && 'nopan'
       )}
-      style={{ minWidth: config.defaultWidth, minHeight: config.defaultHeight }}
+      style={{
+        width: '100%',
+        height: '100%',
+        minWidth: config.defaultWidth,
+        minHeight: config.defaultHeight,
+        willChange: selected ? 'width, height' : 'auto'
+      }}
     >
       {/* Node Resizer - only show when selected */}
       {selected && !locked && (
@@ -65,6 +71,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
           isVisible={selected}
           lineClassName="border-blue-500"
           handleClassName="h-3 w-3 bg-white border-2 border-blue-500 rounded"
+          keepAspectRatio={false}
         />
       )}
 
@@ -116,10 +123,12 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
 
       {/* Content */}
       <div
-        className="text-xs text-gray-700 overflow-hidden"
+        className="overflow-hidden"
         style={{
           height: 'calc(100% - 36px)',
-          minHeight: `calc(${config.defaultHeight}px - 36px)`
+          minHeight: `calc(${config.defaultHeight}px - 36px)`,
+          padding: 0,
+          margin: 0
         }}
       >
         {children}

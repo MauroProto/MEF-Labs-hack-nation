@@ -20,7 +20,8 @@
       "Bash(docker-compose down:*)",
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npx prisma:*)"
     ],
     "deny": [],
     "ask": []
