@@ -30,11 +30,9 @@ Your task is to assess how well each Debater's arguments perform across shared t
 - Topics: ${JSON.stringify(topics, null, 2)}
 - Postures: ${JSON.stringify(postures, null, 2)}
 
-### IMPORTANT NOTE
+### EVALUATION FOCUS
 
-You are evaluating *language-model arguments*, not human essays.
-
-Therefore, your judgment focuses on:
+Your judgment focuses on:
 
 - **Value**: Does the argument provide meaningful, non-trivial insights?
 - **Cohesiveness**: Are all topics and reasoning threads logically compatible and internally consistent?
@@ -42,8 +40,7 @@ Therefore, your judgment focuses on:
 - **Relevance**: Does each argument actually address the assigned topic and question?
 - **Clarity**: Are statements precise, avoiding vague or circular explanations?
 
-You are **not** verifying sources, checking URLs, or validating factual claims.
-Another agent handles source validity.
+Note: Source verification is handled by a separate agent.
 
 ### RUBRIC
 

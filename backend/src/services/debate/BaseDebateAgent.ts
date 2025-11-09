@@ -67,7 +67,7 @@ export abstract class BaseDebateAgent {
       try {
         return JSON.parse(codeBlockMatch[1]);
       } catch (e) {
-        // Continue to next attempt
+        // Try next parsing method
       }
     }
 

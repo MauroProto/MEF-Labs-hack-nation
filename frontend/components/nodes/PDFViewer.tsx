@@ -82,20 +82,19 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
       lastSelectionRectRef.current = rect;
 
       // Position near selection top-right within container (stable & consistent)
-      const relX = rect.right - containerRect.left - 6; // slight padding
-      const relY = rect.top - containerRect.top - 28;   // above selection
+      const relX = rect.right - containerRect.left - 6;
+      const relY = rect.top - containerRect.top - 28;
       const clamped = clampToContainer(relX, relY);
       setSelectedText(text);
       selectedTextRef.current = text;
       setButtonPosition(clamped);
     } catch {
-      // ignore
+      // Selection rect unavailable, skip button positioning
     }
   }, [clampToContainer]);
 
   const checkSelection = useCallback(() => {
     if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current);
-    // Slightly longer delay so we don't fight with text dragging
     selectionTimerRef.current = setTimeout(updateButtonFromSelection, 120);
   }, [updateButtonFromSelection]);
 
@@ -109,7 +108,6 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
     e.stopPropagation();
 
     const text = selectedTextRef.current || selectedText || window.getSelection()?.toString() || '';
-    console.log('Ask AI clicked with text:', text);
 
     if (text && onAskAboutSelection) {
       onAskAboutSelection(text);

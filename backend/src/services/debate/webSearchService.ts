@@ -10,8 +10,6 @@ export async function webSearch(
   query: string,
   maxResults: number = 5
 ): Promise<WebSearchResult[]> {
-  console.log(`[WebSearch] Searching for: "${query}"`);
-
   try {
     // If TAVILY_API_KEY is set, use real search
     if (process.env.TAVILY_API_KEY) {
@@ -35,7 +33,6 @@ export async function webSearch(
           url: r.url,
           snippet: r.content,
         }));
-        console.log(`[WebSearch] Found ${results.length} results`);
         return results;
       } else {
         console.warn(`[WebSearch] API returned status ${response.status}`);

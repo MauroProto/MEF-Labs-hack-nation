@@ -54,7 +54,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
     setStatus('working');
     setOutput('');
     setActivities([]);
-    setProgressMessage('🔍 Conectando con el modelo de investigación...');
+    setProgressMessage('🔍 Connecting to research model...');
     data.status = 'working';
 
     try {

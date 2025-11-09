@@ -44,7 +44,6 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
   useEffect(() => {
     if (data.initialMessage && !initialMessageSentRef.current && connectedPaper && messages.length === 0) {
       initialMessageSentRef.current = true;
-      console.log('Auto-sending initial message:', data.initialMessage);
       setInput(data.initialMessage);
 
       // Trigger send after a short delay to ensure everything is ready

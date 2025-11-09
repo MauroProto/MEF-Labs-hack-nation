@@ -34,7 +34,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
     return pid ? getPaper(pid) : undefined;
   }, [data?.lastPaperId, getPaper]);
 
-  // Lazy-load PDF viewer to avoid breaking initial load and reduce bundle
+  // Lazy-load PDF viewer to reduce bundle size
   const PDFViewer = useMemo(
     () =>
       dynamic(() => import('./PDFViewer').then((m) => m.PDFViewer), {
@@ -72,7 +72,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
       data: {
         label: 'Paper Chat',
         config: chatConfig,
-        initialMessage: `Sobre este extracto: "${selectedText}"`,
+        initialMessage: `About this excerpt: "${selectedText}"`,
         lastPaperId: ctxPaper.id,
       },
       width: chatConfig.defaultWidth,
@@ -106,27 +106,27 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
 
     setLoading(true);
     try {
-      // Crear URL local para previsualización
+      // Create local URL for preview
       const objectUrl = URL.createObjectURL(file);
 
-      // Simular procesamiento breve para feedback
+      // Brief processing for user feedback
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Extraer texto si es PDF (cliente) para dar contexto al Chat
+      // Extract text if PDF (client-side) for chat context
       let extractedText = '';
       const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       if (isPdf) {
         try {
           const arrayBuffer = await file.arrayBuffer();
           const pdfjs: any = await import('pdfjs-dist');
-          // Worker desde CDN (alineado a la versión instalada)
+          // Configure worker from CDN
           if (pdfjs.GlobalWorkerOptions) {
             const ver = (pdfjs as any)?.version || '4.8.69';
             pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${ver}/build/pdf.worker.min.mjs`;
           }
           const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
           const pdf = await loadingTask.promise;
-          const maxPages = Math.min(pdf.numPages, 60); // Limitar para rendimiento
+          const maxPages = Math.min(pdf.numPages, 60); // Limit for performance
           for (let p = 1; p <= maxPages; p++) {
             const page = await pdf.getPage(p);
             const content = await page.getTextContent();
@@ -243,7 +243,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
 
   return (
     <BaseNode id={id} data={data} selected={selected}>
-      {/* Si no hay PDF cargado: mostrar área de carga */}
+      {/* No PDF loaded: show upload area */}
       {!lastPaper?.metadata?.fileUrl ? (
         <div className="w-full h-full flex items-center justify-center">
           <input
@@ -272,7 +272,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
           </label>
         </div>
       ) : (
-        /* Si hay PDF cargado: mostrar visor con selección de texto */
+        /* PDF loaded: show viewer with text selection */
         <PDFViewer
           fileUrl={lastPaper.metadata.fileUrl}
           onAskAboutSelection={handleAskAboutSelection}
