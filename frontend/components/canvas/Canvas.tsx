@@ -112,7 +112,10 @@ export function Canvas() {
         id: `e${params.source}-${params.target}`,
         type: 'smoothstep',
         animated: true,
-        style: { stroke: '#94a3b8', strokeWidth: 2 },
+        style: {
+          stroke: '#64748b',
+          strokeWidth: 3,
+        },
       } as Edge;
 
       setEdges((eds) => addEdge(newEdge, eds));
@@ -130,8 +133,26 @@ export function Canvas() {
     () => ({
       type: 'smoothstep',
       animated: true,
-      style: { stroke: '#94a3b8', strokeWidth: 2 },
+      style: {
+        stroke: '#64748b',
+        strokeWidth: 3,
+      },
     }),
+    []
+  );
+
+  // Handle keyboard delete for both nodes and edges
+  const onNodesDelete = useCallback(
+    (deleted: any[]) => {
+      console.log('Nodes deleted:', deleted);
+    },
+    []
+  );
+
+  const onEdgesDelete = useCallback(
+    (deleted: any[]) => {
+      console.log('Edges deleted:', deleted);
+    },
     []
   );
 
@@ -143,6 +164,8 @@ export function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodesDelete={onNodesDelete}
+        onEdgesDelete={onEdgesDelete}
         nodeTypes={nodeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineComponent={ConnectionLine}
@@ -157,6 +180,10 @@ export function Canvas() {
         selectionOnDrag
         panOnDrag={[1, 2]} // Middle and right mouse button
         zoomOnDoubleClick={false}
+        nodeDragThreshold={1}
+        nodesDraggable={true}
+        edgesSelectable={true}
+        edgesFocusable={true}
       >
         {/* Background with dots */}
         <Background

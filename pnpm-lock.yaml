@@ -199,7 +199,7 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.2)(react@19.2.0)
       react-pdf:
-        specifier: ^9.1.1
+        specifier: ^9.2.1
         version: 9.2.1(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       remark-gfm:
         specifier: ^4.0.1

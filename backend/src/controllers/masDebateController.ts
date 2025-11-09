@@ -2,8 +2,6 @@ import { Request, Response } from "express";
 import { DebateCoordinator } from "../services/debate/DebateCoordinator";
 import { Paper } from "../types/debate.types";
 import { prisma } from "../lib/prisma";
-import fs from "fs/promises";
-import path from "path";
 
 /**
  * Generate questions from a paper
@@ -25,16 +23,11 @@ export async function generateQuestions(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content - check if we have a file path or direct text
-    let paperText: string;
-    if (paperRecord.filePath) {
-      const paperPath = path.join(process.cwd(), paperRecord.filePath);
-      paperText = await fs.readFile(paperPath, "utf-8");
-    } else if (paperRecord.fullText) {
-      paperText = paperRecord.fullText;
-    } else {
+    // Read paper content from database
+    if (!paperRecord.fullText) {
       return res.status(400).json({ error: "Paper has no content" });
     }
+    const paperText = paperRecord.fullText;
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -45,10 +38,10 @@ export async function generateQuestions(req: Request, res: Response) {
     const coordinator = new DebateCoordinator();
     const questions = await coordinator.generateQuestions(paper);
 
-    res.json({ questions });
+    return res.json({ questions });
   } catch (error) {
     console.error("Error generating questions:", error);
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to generate questions",
       details: error instanceof Error ? error.message : String(error),
     });
@@ -75,16 +68,11 @@ export async function generatePosturesAndTopics(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content - check if we have a file path or direct text
-    let paperText: string;
-    if (paperRecord.filePath) {
-      const paperPath = path.join(process.cwd(), paperRecord.filePath);
-      paperText = await fs.readFile(paperPath, "utf-8");
-    } else if (paperRecord.fullText) {
-      paperText = paperRecord.fullText;
-    } else {
+    // Read paper content from database
+    if (!paperRecord.fullText) {
       return res.status(400).json({ error: "Paper has no content" });
     }
+    const paperText = paperRecord.fullText;
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -99,10 +87,10 @@ export async function generatePosturesAndTopics(req: Request, res: Response) {
       numPostures
     );
 
-    res.json(result);
+    return res.json(result);
   } catch (error) {
     console.error("Error generating postures and topics:", error);
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to generate postures and topics",
       details: error instanceof Error ? error.message : String(error),
     });
@@ -129,16 +117,11 @@ export async function runDebate(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content - check if we have a file path or direct text
-    let paperText: string;
-    if (paperRecord.filePath) {
-      const paperPath = path.join(process.cwd(), paperRecord.filePath);
-      paperText = await fs.readFile(paperPath, "utf-8");
-    } else if (paperRecord.fullText) {
-      paperText = paperRecord.fullText;
-    } else {
+    // Read paper content from database
+    if (!paperRecord.fullText) {
       return res.status(400).json({ error: "Paper has no content" });
     }
+    const paperText = paperRecord.fullText;
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -171,7 +154,7 @@ export async function runDebate(req: Request, res: Response) {
 
         res.write(`event: complete\n`);
         res.write(`data: ${JSON.stringify(report)}\n\n`);
-        res.end();
+        return res.end();
       } catch (error) {
         res.write(`event: error\n`);
         res.write(
@@ -179,7 +162,7 @@ export async function runDebate(req: Request, res: Response) {
             error: error instanceof Error ? error.message : String(error),
           })}\n\n`
         );
-        res.end();
+        return res.end();
       }
     } else {
       // Regular JSON response
@@ -189,16 +172,17 @@ export async function runDebate(req: Request, res: Response) {
         numPostures
       );
 
-      res.json(report);
+      return res.json(report);
     }
   } catch (error) {
     console.error("Error running debate:", error);
     if (!res.headersSent) {
-      res.status(500).json({
+      return res.status(500).json({
         error: "Failed to run debate",
         details: error instanceof Error ? error.message : String(error),
       });
     }
+    return;
   }
 }
 
@@ -222,16 +206,11 @@ export async function runCompleteDebateFlow(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content - check if we have a file path or direct text
-    let paperText: string;
-    if (paperRecord.filePath) {
-      const paperPath = path.join(process.cwd(), paperRecord.filePath);
-      paperText = await fs.readFile(paperPath, "utf-8");
-    } else if (paperRecord.fullText) {
-      paperText = paperRecord.fullText;
-    } else {
+    // Read paper content from database
+    if (!paperRecord.fullText) {
       return res.status(400).json({ error: "Paper has no content" });
     }
+    const paperText = paperRecord.fullText;
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -264,7 +243,7 @@ export async function runCompleteDebateFlow(req: Request, res: Response) {
 
         res.write(`event: complete\n`);
         res.write(`data: ${JSON.stringify(report)}\n\n`);
-        res.end();
+        return res.end();
       } catch (error) {
         res.write(`event: error\n`);
         res.write(
@@ -272,7 +251,7 @@ export async function runCompleteDebateFlow(req: Request, res: Response) {
             error: error instanceof Error ? error.message : String(error),
           })}\n\n`
         );
-        res.end();
+        return res.end();
       }
     } else {
       // Regular JSON response
@@ -282,16 +261,17 @@ export async function runCompleteDebateFlow(req: Request, res: Response) {
         numPostures
       );
 
-      res.json(report);
+      return res.json(report);
     }
   } catch (error) {
     console.error("Error running complete debate flow:", error);
     if (!res.headersSent) {
-      res.status(500).json({
+      return res.status(500).json({
         error: "Failed to run complete debate flow",
         details: error instanceof Error ? error.message : String(error),
       });
     }
+    return;
   }
 }
 

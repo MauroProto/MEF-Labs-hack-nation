@@ -12,6 +12,9 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { BaseNode } from './BaseNode';
 import { Upload, Loader2 } from 'lucide-react';
 import { usePaperContextStore } from '@/lib/stores/paperContextStore';
+import dynamic from 'next/dynamic';
+import { useReactFlow } from '@xyflow/react';
+import { NODE_CONFIGS } from '@/lib/nodeTypes';
 
 interface PaperUploadNodeProps {
   id: string;
@@ -21,13 +24,81 @@ interface PaperUploadNodeProps {
 
 export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
   const [loading, setLoading] = useState(false);
+  const creatingRef = React.useRef(false);
 
-  const { addPaper, getPaper, connectNodeToPaper } = usePaperContextStore();
+  const { addPaper, getPaper, connectNodeToPaper, getPaperForNode } = usePaperContextStore();
+  const { setNodes, setEdges, getNode } = useReactFlow();
 
   const lastPaper = useMemo(() => {
     const pid = data?.lastPaperId as string | undefined;
     return pid ? getPaper(pid) : undefined;
   }, [data?.lastPaperId, getPaper]);
+
+  // Lazy-load PDF viewer to avoid breaking initial load and reduce bundle
+  const PDFViewer = useMemo(
+    () =>
+      dynamic(() => import('./PDFViewer').then((m) => m.PDFViewer), {
+        ssr: false,
+        loading: () => (
+          <div className="w-full h-full flex items-center justify-center">
+            <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
+          </div>
+        ),
+      }),
+    []
+  );
+
+  const handleAskAboutSelection = useCallback((selectedText: string) => {
+    if (creatingRef.current) return; // debounce rapid clicks
+    creatingRef.current = true;
+    setTimeout(() => (creatingRef.current = false), 400);
+
+    const currentNode = getNode(id);
+    const ctxPaper = getPaperForNode(id) || lastPaper;
+    if (!currentNode || !ctxPaper) return;
+
+    // Create new chat node to the right of the PDF node
+    const uid = (globalThis as any).crypto?.randomUUID?.() || `${Date.now()}-${Math.floor(Math.random()*1e6)}`;
+    const newChatNodeId = `paper-chat-${uid}`;
+    const chatConfig = NODE_CONFIGS['paper-chat'];
+
+    const newChatNode = {
+      id: newChatNodeId,
+      type: 'paper-chat',
+      position: {
+        x: currentNode.position.x + (currentNode.width || chatConfig.defaultWidth) + 50,
+        y: currentNode.position.y,
+      },
+      data: {
+        label: 'Paper Chat',
+        config: chatConfig,
+        initialMessage: `Sobre este extracto: "${selectedText}"`,
+        lastPaperId: ctxPaper.id,
+      },
+      width: chatConfig.defaultWidth,
+      height: chatConfig.defaultHeight,
+    };
+
+    // Create edge connecting PDF node to chat node
+    const newEdge = {
+      id: `e${id}-${newChatNodeId}`,
+      source: id,
+      target: newChatNodeId,
+      type: 'smoothstep',
+      animated: true,
+      style: {
+        stroke: '#64748b',
+        strokeWidth: 3,
+      },
+    };
+
+    // Add the new node and edge
+    setNodes((nds) => [...nds, newChatNode]);
+    setEdges((eds) => [...eds, newEdge]);
+
+    // Immediately bind chat node to the same paper for deterministic context
+    connectNodeToPaper(newChatNodeId, ctxPaper.id);
+  }, [id, lastPaper, getNode, setNodes, setEdges, connectNodeToPaper, getPaperForNode]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,9 +119,10 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         try {
           const arrayBuffer = await file.arrayBuffer();
           const pdfjs: any = await import('pdfjs-dist');
-          // Worker desde CDN (alineado a lock actual)
+          // Worker desde CDN (alineado a la versión instalada)
           if (pdfjs.GlobalWorkerOptions) {
-            pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
+            const ver = (pdfjs as any)?.version || '4.8.69';
+            pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${ver}/build/pdf.worker.min.mjs`;
           }
           const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
           const pdf = await loadingTask.promise;
@@ -200,18 +272,10 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
           </label>
         </div>
       ) : (
-        /* Si hay PDF cargado: mostrar visor grande */
-        <iframe
-          src={lastPaper.metadata.fileUrl}
-          title="PDF Viewer"
-          className="w-full h-full block"
-          style={{
-            display: 'block',
-            border: 'none',
-            margin: 0,
-            padding: 0,
-            pointerEvents: (selected && !data.locked) ? 'none' : 'auto'
-          }}
+        /* Si hay PDF cargado: mostrar visor con selección de texto */
+        <PDFViewer
+          fileUrl={lastPaper.metadata.fileUrl}
+          onAskAboutSelection={handleAskAboutSelection}
         />
       )}
     </BaseNode>
