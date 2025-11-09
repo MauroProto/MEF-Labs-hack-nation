@@ -120,12 +120,26 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   toggleNodeLock: (nodeId) =>
     set((state) => {
       const newLockedNodes = new Set(state.lockedNodes);
-      if (newLockedNodes.has(nodeId)) {
+      const isCurrentlyLocked = newLockedNodes.has(nodeId);
+
+      if (isCurrentlyLocked) {
         newLockedNodes.delete(nodeId);
       } else {
         newLockedNodes.add(nodeId);
       }
-      return { lockedNodes: newLockedNodes };
+
+      // Update the node's data.locked and draggable properties
+      const newNodes = state.nodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: { ...node.data, locked: !isCurrentlyLocked },
+              draggable: isCurrentlyLocked, // If was locked, now draggable
+            }
+          : node
+      );
+
+      return { lockedNodes: newLockedNodes, nodes: newNodes };
     }),
 
   isNodeLocked: (nodeId) => get().lockedNodes.has(nodeId),

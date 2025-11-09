@@ -162,7 +162,7 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
             </div>
           ) : (
             <div className="space-y-6">
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <div key={message.id} className="space-y-2">
                   <div className="flex items-baseline gap-2">
                     <span className={`font-semibold text-sm ${
@@ -207,7 +207,7 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
                       <div className="whitespace-pre-wrap break-words">{message.content}</div>
                     )}
                   </div>
-                  {message.role === 'assistant' && (
+                  {message.role === 'assistant' && index < messages.length - 1 && (
                     <div className="border-b border-gray-200 pt-3" />
                   )}
                 </div>

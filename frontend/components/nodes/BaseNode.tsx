@@ -34,16 +34,41 @@ export interface BaseNodeProps {
 export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
   const { config, locked = false } = data;
   const { toggleNodeLock } = useCanvasStore();
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
 
   const handleLockToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleNodeLock(id);
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, locked: !locked },
+              draggable: locked, // If currently locked, make draggable
+            }
+          : node
+      )
+    );
   };
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     deleteElements({ nodes: [{ id }] });
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, locked: !locked },
+              draggable: locked, // If currently locked, make draggable
+            }
+          : node
+      )
+    );
   };
 
   const Icon = config.icon;
@@ -52,8 +77,9 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
     <div
       className={cn(
         'rounded-lg border bg-white text-gray-900',
-        selected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200',
-        locked && 'nopan'
+        selected && !locked && 'border-blue-500 ring-1 ring-blue-200',
+        !selected && !locked && 'border-gray-200',
+        locked && 'border-orange-500 ring-2 ring-orange-200 nopan'
       )}
       style={{
         width: '100%',
@@ -62,6 +88,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
         minHeight: config.defaultHeight,
         willChange: selected ? 'width, height' : 'auto'
       }}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Node Resizer - only show when selected */}
       {selected && !locked && (
