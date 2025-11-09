@@ -13,8 +13,8 @@ interface EnhancedToolbarProps {
   onAddNode: (nodeType: string) => void;
 }
 
-// Only the 4 essential nodes
-const ESSENTIAL_NODES = ['paper-upload', 'note', 'paper-chat', 'web-research'] as const;
+// Essential nodes including debate
+const ESSENTIAL_NODES = ['paper-upload', 'note', 'paper-chat', 'debate', 'web-research'] as const;
 
 export function EnhancedToolbar({ onAddNode }: EnhancedToolbarProps) {
   return (
