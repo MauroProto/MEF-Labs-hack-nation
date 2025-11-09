@@ -25,7 +25,7 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number | null>(null);
 
   const { getPaperForNode } = usePaperContextStore();
-  const { debateState, loading, fetchQuestions, runDebate, reset } = useMasDebate();
+  const { debateState, loading, fetchQuestions, runDebate, loadDebateFromHistory, reset } = useMasDebate();
 
   const connectedPaper = getPaperForNode(id);
 
@@ -63,21 +63,48 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
   }, [connectedPaper, customQuestion, runDebate]);
 
   const renderContent = () => {
-    // Show completed debate
+    // Show completed debate with history sidebar
     if (debateState.status === 'completed' && debateState.report && debateState.arguments) {
       return (
-        <div className="h-full flex flex-col">
-          <div className="flex-shrink-0 p-3 border-b flex items-center justify-between">
-            <button
-              onClick={reset}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              ← Start New Debate
-            </button>
-            <Badge variant="default">Completed</Badge>
-          </div>
-          <div className="flex-1 overflow-auto p-4">
-            <MasDebateViewer report={debateState.report} arguments={debateState.arguments} />
+        <div className="h-full flex">
+          {/* History sidebar */}
+          {debateState.history.length > 0 && (
+            <div className="w-64 border-r bg-gray-50 flex flex-col">
+              <div className="p-3 border-b bg-white">
+                <h3 className="text-sm font-semibold text-gray-700">Debate History</h3>
+                <p className="text-xs text-gray-500 mt-1">{debateState.history.length} debates</p>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {debateState.history.map((entry, idx) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => loadDebateFromHistory(entry.id)}
+                    className="w-full text-left p-2 bg-white border border-gray-200 rounded hover:border-purple-300 hover:bg-purple-50 transition-colors"
+                  >
+                    <p className="text-xs font-medium text-gray-900 line-clamp-2">{entry.question}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main content */}
+          <div className="flex-1 flex flex-col">
+            <div className="flex-shrink-0 p-3 border-b flex items-center justify-between">
+              <button
+                onClick={reset}
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                ← Run Another Debate
+              </button>
+              <Badge variant="default">Completed</Badge>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <MasDebateViewer report={debateState.report} arguments={debateState.arguments} />
+            </div>
           </div>
         </div>
       );
@@ -116,6 +143,52 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
                     <li key={i}>• {t}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Show per-debater progress */}
+            {debateState.debaterProgress.length > 0 && (
+              <div className="w-full max-w-md bg-white border-2 border-gray-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Debater Progress:</p>
+                <div className="space-y-3">
+                  {debateState.debaterProgress.map((debater, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        {debater.status === 'idle' && (
+                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span className="text-xs text-gray-500">{i + 1}</span>
+                          </div>
+                        )}
+                        {debater.status === 'running' && (
+                          <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+                        )}
+                        {debater.status === 'complete' && (
+                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                        {debater.status === 'error' && (
+                          <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
+                            <AlertCircle className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-900 truncate">
+                          Debater {i + 1}: {debater.posture}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {debater.status === 'idle' && 'Waiting...'}
+                          {debater.status === 'running' && 'Generating argument...'}
+                          {debater.status === 'complete' && 'Complete'}
+                          {debater.status === 'error' && `Error: ${debater.error}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
