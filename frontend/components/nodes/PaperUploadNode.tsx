@@ -111,14 +111,14 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
             {loading ? (
               <>
                 <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
-                <span className="text-sm text-gray-600">Loading PDF...</span>
+                <span className="text-base text-gray-600">Loading PDF...</span>
               </>
             ) : (
               <>
                 <Upload className="h-12 w-12 text-gray-400" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-700">Upload PDF</p>
-                  <p className="text-xs text-gray-500">Click to select a PDF file</p>
+                  <p className="text-base font-medium text-gray-700">Upload PDF</p>
+                  <p className="text-sm text-gray-500">Click to select a PDF file</p>
                 </div>
               </>
             )}

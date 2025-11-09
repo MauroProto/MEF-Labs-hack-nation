@@ -132,11 +132,11 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
         {/* Connected Paper Indicator */}
         {connectedPaper ? (
           <div className="p-2 bg-blue-50 rounded-t border-b border-blue-100 flex items-start gap-2 flex-shrink-0">
-            <FileText className="h-3.5 w-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-blue-900 truncate">{connectedPaper.title}</div>
+              <div className="text-sm font-medium text-blue-900 truncate">{connectedPaper.title}</div>
               {connectedPaper.authors && connectedPaper.authors.length > 0 && (
-                <div className="text-[9px] text-blue-600 truncate mt-0.5">
+                <div className="text-xs text-blue-600 truncate mt-0.5">
                   {connectedPaper.authors.map(a => a.name).join(', ')}
                 </div>
               )}
@@ -144,8 +144,8 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
           </div>
         ) : (
           <div className="p-2 bg-amber-50 rounded-t border-b border-amber-200 flex-shrink-0">
-            <div className="text-[11px] text-amber-900 font-medium">No paper connected</div>
-            <div className="text-[9px] text-amber-700 mt-0.5">Connect a paper node to enable chat</div>
+            <div className="text-sm text-amber-900 font-medium">No paper connected</div>
+            <div className="text-xs text-amber-700 mt-0.5">Connect a paper node to enable chat</div>
           </div>
         )}
 
@@ -165,16 +165,16 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
               {messages.map((message, index) => (
                 <div key={message.id} className="space-y-2">
                   <div className="flex items-baseline gap-2">
-                    <span className={`font-semibold text-sm ${
+                    <span className={`font-semibold text-base ${
                       message.role === 'user' ? 'text-blue-600' : 'text-gray-900'
                     }`}>
                       {message.role === 'user' ? 'You' : 'Assistant'}
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-sm text-gray-400">
                       {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className={`text-sm leading-relaxed ${
+                  <div className={`text-base leading-relaxed ${
                     message.role === 'user' ? 'text-gray-700' : 'text-gray-900'
                   }`}>
                     {message.role === 'assistant' ? (

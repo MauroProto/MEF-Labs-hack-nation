@@ -207,6 +207,29 @@ export function EnhancedCanvas() {
           position="bottom-left"
         />
 
+        {/* Empty State - Welcome Message */}
+        {nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+            <div className="flex flex-col items-center mt-32">
+              <pre className="text-gray-400 text-base font-mono leading-snug text-center">
+{`┌──────────────────────────┐
+│                          │
+│    Research Canvas       │
+│                          │
+│    Click below to add    │
+│    your first node       │
+│                          │
+└──────────────────────────┘`}
+              </pre>
+              <div className="flex flex-col items-center mt-2">
+                <div className="text-gray-400 text-2xl">│</div>
+                <div className="text-gray-400 text-2xl">│</div>
+                <div className="text-gray-400 text-2xl">▼</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Toolbar - Node Palette */}
         <Panel position="bottom-center">
           <EnhancedToolbar onAddNode={addNode} />
