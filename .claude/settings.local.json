@@ -25,7 +25,11 @@
       "Bash(npx tsx:*)",
       "Bash(nul)",
       "Bash(tee:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(kill:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
