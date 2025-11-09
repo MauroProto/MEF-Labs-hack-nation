@@ -25,6 +25,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Eye, EyeOff } from 'lucide-react';
+
 import { EnhancedToolbar } from './EnhancedToolbar';
 import { SimpleControls } from './SimpleControls';
 import { NODE_COMPONENTS } from '@/lib/nodeComponents';

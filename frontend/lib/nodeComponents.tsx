@@ -8,6 +8,7 @@ import { NodeType } from './nodeTypes';
 import { PaperUploadNode } from '@/components/nodes/PaperUploadNode';
 import { NoteNode } from '@/components/nodes/NoteNode';
 import { PaperChatNode } from '@/components/nodes/PaperChatNode';
+import { WebResearchNode } from '@/components/nodes/WebResearchNode';
 import { ResearcherAgentNode } from '@/components/nodes/ResearcherAgentNode';
 import { CriticAgentNode } from '@/components/nodes/CriticAgentNode';
 import { SynthesizerAgentNode } from '@/components/nodes/SynthesizerAgentNode';
@@ -22,7 +23,7 @@ export const NODE_COMPONENTS: Record<NodeType, React.ComponentType<any>> = {
 
   // Research nodes
   'paper-chat': PaperChatNode,
-  'web-research': BaseNode, // TODO: Implement WebResearchNode
+  'web-research': WebResearchNode,
 
   // Agent nodes (minimal UI)
   'researcher-agent': ResearcherAgentNode,

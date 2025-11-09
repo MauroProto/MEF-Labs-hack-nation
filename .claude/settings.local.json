@@ -21,7 +21,8 @@
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(kill:*)"
     ],
     "deny": [],
     "ask": []

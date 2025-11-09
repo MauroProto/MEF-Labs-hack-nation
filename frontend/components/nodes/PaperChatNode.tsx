@@ -129,28 +129,25 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
   return (
     <BaseNode id={id} data={data} selected={selected}>
       <div className="flex flex-col h-full w-full">
-        {/* Connected Paper Indicator */}
-        {connectedPaper ? (
-          <div className="p-2 bg-blue-50 rounded-t border-b border-blue-100 flex items-start gap-2 flex-shrink-0">
-            <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-blue-900 truncate">{connectedPaper.title}</div>
-              {connectedPaper.authors && connectedPaper.authors.length > 0 && (
-                <div className="text-xs text-blue-600 truncate mt-0.5">
-                  {connectedPaper.authors.map(a => a.name).join(', ')}
-                </div>
-              )}
-            </div>
+        {/* Minimal header: tiny status + paper chip */}
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b border-gray-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={connectedPaper ? 'h-1.5 w-1.5 rounded-full bg-emerald-500' : 'h-1.5 w-1.5 rounded-full bg-amber-500'} />
+            {connectedPaper ? (
+              <div className="truncate max-w-[240px] rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700">
+                <span className="font-medium text-gray-900">Paper:</span> {connectedPaper.title}
+              </div>
+            ) : (
+              <div className="text-[11px] text-gray-500">Conecta un paper para dar contexto</div>
+            )}
           </div>
-        ) : (
-          <div className="p-2 bg-amber-50 rounded-t border-b border-amber-200 flex-shrink-0">
-            <div className="text-sm text-amber-900 font-medium">No paper connected</div>
-            <div className="text-xs text-amber-700 mt-0.5">Connect a paper node to enable chat</div>
-          </div>
-        )}
+          {messages.length > 0 && (
+            <div className="text-[10px] text-gray-400">{messages.length}</div>
+          )}
+        </div>
 
-        {/* Chat Messages Area - Flexible height */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white">
+        {/* Messages */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 bg-white">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <MessageCircle className="h-10 w-10 mb-3" />
@@ -161,43 +158,31 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {messages.map((message, index) => (
-                <div key={message.id} className="space-y-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className={`font-semibold text-base ${
-                      message.role === 'user' ? 'text-blue-600' : 'text-gray-900'
-                    }`}>
-                      {message.role === 'user' ? 'You' : 'Assistant'}
-                    </span>
-                    <span className="text-sm text-gray-400">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div className={`text-base leading-relaxed ${
-                    message.role === 'user' ? 'text-gray-700' : 'text-gray-900'
-                  }`}>
+            <div className="space-y-2">
+              {messages.map((message) => (
+                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`px-3 py-2 rounded-xl text-[13px] leading-relaxed max-w-[85%] ${
+                      message.role === 'user'
+                        ? 'bg-neutral-900 text-white'
+                        : 'bg-neutral-100 text-neutral-900 border border-neutral-200'
+                    }`}
+                  >
                     {message.role === 'assistant' ? (
                       <div className="prose prose-sm max-w-none">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                            ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="mb-3 ml-5 list-decimal space-y-1">{children}</ol>,
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-0.5">{children}</ul>,
+                            ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-0.5">{children}</ol>,
                             li: ({ children }) => <li>{children}</li>,
                             code: ({ children }) => (
-                              <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono text-gray-800">
-                                {children}
-                              </code>
+                              <code className="bg-gray-200 px-1 py-0.5 rounded text-[12px] font-mono text-gray-900">{children}</code>
                             ),
                             pre: ({ children }) => (
-                              <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto mb-3 font-mono">
-                                {children}
-                              </pre>
+                              <pre className="bg-gray-100 p-2 rounded text-[12px] overflow-x-auto mb-2 font-mono">{children}</pre>
                             ),
-                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                            em: ({ children }) => <em className="italic">{children}</em>,
                           }}
                         >
                           {message.content}
@@ -207,9 +192,6 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
                       <div className="whitespace-pre-wrap break-words">{message.content}</div>
                     )}
                   </div>
-                  {message.role === 'assistant' && index < messages.length - 1 && (
-                    <div className="border-b border-gray-200 pt-3" />
-                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -217,35 +199,27 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
           )}
         </div>
 
-        {/* Input Area - Fixed at bottom */}
-        <form
-          onSubmit={handleSendMessage}
-          className="flex-shrink-0 flex items-center gap-3 p-4 bg-white border-t border-gray-200 rounded-b"
-        >
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={connectedPaper ? 'Ask a question…' : 'Connect a paper first'}
-            disabled={loading || !connectedPaper}
-            className="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || loading || !connectedPaper}
-            className="p-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-            title="Send message"
-          >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-          </button>
-        </form>
-
-        {/* Message Counter */}
-        {messages.length > 0 && (
-          <div className="px-2 py-1 text-[9px] text-gray-400 text-center bg-gray-50 border-t border-gray-100">
-            {messages.length} message{messages.length !== 1 ? 's' : ''}
+        {/* Input */}
+        <form onSubmit={handleSendMessage} className="flex-shrink-0 px-3 py-2 bg-white border-t border-gray-100">
+          <div className="flex items-center gap-2 w-full rounded-full border border-gray-200 bg-white px-3 py-1.5">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={connectedPaper ? 'Escribe tu pregunta…' : 'Conecta un paper para preguntar'}
+              disabled={loading || !connectedPaper}
+              className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || loading || !connectedPaper}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:bg-gray-300"
+              title="Enviar"
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            </button>
           </div>
-        )}
+        </form>
       </div>
     </BaseNode>
   );
