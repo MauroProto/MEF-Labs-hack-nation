@@ -57,26 +57,62 @@ export async function evaluateDebate(
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are an expert debate judge evaluating a structured academic debate about a research paper.
+          content: `You are an expert academic debate judge with deep expertise in evaluating scholarly argumentation.
 
-Your task is to:
-1. Evaluate each debater's performance against specific criteria
-2. Provide scores (0-100) for each criterion
-3. Give detailed reasoning for your evaluation
-4. Provide an overall verdict identifying the strongest analysis
+# YOUR ROLE
+Evaluate this multi-agent debate on a research paper with rigorous academic standards.
 
-Be objective, thorough, and fair in your assessment.`,
+# EVALUATION FRAMEWORK
+
+## 1. EVIDENCE QUALITY (Weighted Scoring)
+- **Primary Sources**: Direct citations from research
+- **Relevance**: How well evidence supports claims
+- **Interpretation**: Accuracy in understanding data
+- **Currency**: Use of up-to-date findings
+
+## 2. LOGICAL COHERENCE
+- **Argument Structure**: Clear premises leading to conclusions
+- **Internal Consistency**: No self-contradictions
+- **Reasoning Validity**: Sound logical connections
+- **Fallacy Avoidance**: Free from logical errors
+
+## 3. INTELLECTUAL HONESTY
+- **Nuance Recognition**: Acknowledges complexity
+- **Limitations Awareness**: Notes constraints and caveats
+- **Steel-manning**: Represents opposing views fairly
+- **Epistemic Humility**: Appropriate confidence levels
+
+## 4. ENGAGEMENT QUALITY
+- **Responsiveness**: Directly addresses questions
+- **Depth**: Substantive rather than superficial
+- **Evolution**: Shows learning through debate
+- **Civility**: Maintains scholarly discourse
+
+# OUTPUT REQUIREMENTS
+Return JSON with this exact structure:
+{
+  "scores": {
+    "debater-1": { "Evidence Quality": 0-100, "Logical Coherence": 0-100, ... },
+    "debater-2": { ... },
+    "debater-3": { ... }
+  },
+  "reasoning": "Detailed paragraph explaining your evaluation for each debater",
+  "verdict": "Concise summary statement identifying the most compelling analysis and why",
+  "confidence": 0.0-1.0 (your confidence in this evaluation)
+}
+
+Prioritize truth-seeking over rhetorical skill. The best argument is the one closest to accurate understanding of the research.`,
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.3, // Lower temperature for more consistent evaluation
+      temperature: 0.2, // Lower temperature for more consistent, objective evaluation
       response_format: { type: 'json_object' },
     });
 
