@@ -17,7 +17,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BaseNode } from './BaseNode';
 import {
   Type,
-  AlignLeft,
   List,
   ListOrdered,
   Code,
@@ -194,7 +193,7 @@ export function NoteNode({ id, data, selected }: NoteNodeProps) {
                 <Palette className="h-3.5 w-3.5 text-gray-600 transition-colors" />
               </button>
               {showColorPicker && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex gap-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex gap-1.5 z-50">
                   {NOTE_COLORS.map(color => (
                     <button
                       key={color.name}
@@ -233,7 +232,7 @@ export function NoteNode({ id, data, selected }: NoteNodeProps) {
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className={`transition-opacity duration-200 ${showPreview ? 'opacity-100' : 'opacity-0 absolute'}`}>
             {showPreview && (
-              <div className={`p-4 prose prose-sm max-w-none ${currentColor.bg} animate-in fade-in duration-200`}>
+              <div className={`p-4 prose prose-sm max-w-none ${currentColor.bg}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -277,7 +276,7 @@ export function NoteNode({ id, data, selected }: NoteNodeProps) {
                 onChange={(e) => setContent(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Start writing... (Markdown supported)"
-                className={`w-full h-full px-4 py-3 text-base ${currentColor.bg} focus:outline-none resize-none font-sans leading-relaxed text-gray-800 placeholder:text-gray-400 transition-all duration-200 animate-in fade-in`}
+                className={`w-full h-full px-4 py-3 text-base ${currentColor.bg} focus:outline-none resize-none font-sans leading-relaxed text-gray-800 placeholder:text-gray-400 transition-all duration-200`}
                 style={{ minHeight: '200px' }}
               />
             )}
@@ -296,12 +295,12 @@ export function NoteNode({ id, data, selected }: NoteNodeProps) {
             {saving ? (
               <>
                 <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-blue-600 animate-in fade-in slide-in-from-right-2 duration-200">Saving...</span>
+                <span className="text-blue-600">Saving...</span>
               </>
             ) : (
               <>
-                <Check className="h-3 w-3 text-green-500 animate-in fade-in scale-in-0 duration-300" />
-                <span className="text-green-600 animate-in fade-in slide-in-from-right-2 duration-200">Saved</span>
+                <Check className="h-3 w-3 text-green-500" />
+                <span className="text-green-600">Saved</span>
               </>
             )}
           </div>
