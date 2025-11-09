@@ -25,9 +25,16 @@ export async function generateQuestions(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content
-    const paperPath = path.join(process.cwd(), paperRecord.filePath);
-    const paperText = await fs.readFile(paperPath, "utf-8");
+    // Read paper content - check if we have a file path or direct text
+    let paperText: string;
+    if (paperRecord.filePath) {
+      const paperPath = path.join(process.cwd(), paperRecord.filePath);
+      paperText = await fs.readFile(paperPath, "utf-8");
+    } else if (paperRecord.fullText) {
+      paperText = paperRecord.fullText;
+    } else {
+      return res.status(400).json({ error: "Paper has no content" });
+    }
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -68,9 +75,16 @@ export async function generatePosturesAndTopics(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content
-    const paperPath = path.join(process.cwd(), paperRecord.filePath);
-    const paperText = await fs.readFile(paperPath, "utf-8");
+    // Read paper content - check if we have a file path or direct text
+    let paperText: string;
+    if (paperRecord.filePath) {
+      const paperPath = path.join(process.cwd(), paperRecord.filePath);
+      paperText = await fs.readFile(paperPath, "utf-8");
+    } else if (paperRecord.fullText) {
+      paperText = paperRecord.fullText;
+    } else {
+      return res.status(400).json({ error: "Paper has no content" });
+    }
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -115,9 +129,16 @@ export async function runDebate(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content
-    const paperPath = path.join(process.cwd(), paperRecord.filePath);
-    const paperText = await fs.readFile(paperPath, "utf-8");
+    // Read paper content - check if we have a file path or direct text
+    let paperText: string;
+    if (paperRecord.filePath) {
+      const paperPath = path.join(process.cwd(), paperRecord.filePath);
+      paperText = await fs.readFile(paperPath, "utf-8");
+    } else if (paperRecord.fullText) {
+      paperText = paperRecord.fullText;
+    } else {
+      return res.status(400).json({ error: "Paper has no content" });
+    }
 
     const paper: Paper = {
       id: paperRecord.id,
@@ -201,9 +222,16 @@ export async function runCompleteDebateFlow(req: Request, res: Response) {
       return res.status(404).json({ error: "Paper not found" });
     }
 
-    // Read paper content
-    const paperPath = path.join(process.cwd(), paperRecord.filePath);
-    const paperText = await fs.readFile(paperPath, "utf-8");
+    // Read paper content - check if we have a file path or direct text
+    let paperText: string;
+    if (paperRecord.filePath) {
+      const paperPath = path.join(process.cwd(), paperRecord.filePath);
+      paperText = await fs.readFile(paperPath, "utf-8");
+    } else if (paperRecord.fullText) {
+      paperText = paperRecord.fullText;
+    } else {
+      return res.status(400).json({ error: "Paper has no content" });
+    }
 
     const paper: Paper = {
       id: paperRecord.id,

@@ -69,16 +69,69 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         }
       }
 
-      const paperData = {
-        id: `paper-${Date.now()}`,
-        canvasId: 'default',
+      // First, ensure we have a canvas (create or get default)
+      let canvasId = 'default';
+      try {
+        const canvasResponse = await fetch('http://localhost:4000/api/canvas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Default Canvas' }),
+        });
+        if (canvasResponse.ok) {
+          const canvasData = await canvasResponse.json();
+          canvasId = canvasData.data?.id || 'default';
+        }
+      } catch (err) {
+        console.warn('Failed to create/get canvas, using default', err);
+      }
+
+      // Upload paper to backend
+      const backendPaperData = {
+        canvasId,
         title: file.name.replace(/\.[^/.]+$/, ''),
-        authors: [{ name: 'Unknown Author' }],
+        authors: ['Unknown Author'],
         abstract: null,
         fullText: extractedText || 'Uploaded PDF (preview available).',
         citations: [],
         metadata: {
-          uploadedAt: new Date(),
+          uploadedAt: new Date().toISOString(),
+          fileUrl: objectUrl,
+          filename: file.name,
+        },
+      };
+
+      let savedPaper;
+      try {
+        const paperResponse = await fetch('http://localhost:4000/api/papers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backendPaperData),
+        });
+
+        if (!paperResponse.ok) {
+          throw new Error('Failed to save paper to backend');
+        }
+
+        const result = await paperResponse.json();
+        savedPaper = result.data;
+      } catch (err) {
+        console.error('Failed to save paper to backend:', err);
+        alert('Failed to save paper to database. Please try again.');
+        return;
+      }
+
+      // Create frontend paper object with backend ID
+      const paperData = {
+        id: savedPaper.id,
+        canvasId: savedPaper.canvasId,
+        title: savedPaper.title,
+        authors: savedPaper.authors.map((name: string) => ({ name })),
+        abstract: savedPaper.abstract,
+        fullText: savedPaper.fullText,
+        citations: savedPaper.citations || [],
+        metadata: {
+          ...savedPaper.metadata,
+          uploadedAt: new Date(savedPaper.createdAt),
           fileUrl: objectUrl,
           filename: file.name,
         },
