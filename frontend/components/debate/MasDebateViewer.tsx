@@ -27,7 +27,7 @@ const POSTURE_COLORS = [
 ];
 
 export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateViewerProps) {
-  const [selectedTopic, setSelectedTopic] = useState(0);
+  const [selectedTab, setSelectedTab] = useState("0");
 
   return (
     <div className="space-y-4">
@@ -45,8 +45,8 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
       </Card>
 
       {/* Topics Tabs */}
-      <Tabs value={selectedTopic.toString()} onValueChange={(v) => setSelectedTopic(parseInt(v))}>
-        <TabsList className="w-full flex flex-wrap gap-2">
+      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+        <TabsList className="w-full flex flex-wrap gap-2 h-auto">
           {report.topics.map((topic, index) => (
             <TabsTrigger key={index} value={index.toString()} className="text-sm flex-1 min-w-[150px]">
               {topic}
@@ -59,9 +59,7 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
 
         {/* Topic Content */}
         {report.topics.map((topic, topicIndex) => (
-          <TabsContent key={topicIndex} value={topicIndex.toString()} className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{topic}</h3>
-
+          <TabsContent key={topicIndex} value={topicIndex.toString()} className="space-y-4 mt-4">
             {/* Debaters' Arguments for this Topic */}
             <div className="space-y-4">
               {debaterArgs?.map((arg, debaterIndex) => {
