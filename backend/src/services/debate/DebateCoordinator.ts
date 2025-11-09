@@ -121,9 +121,11 @@ export class DebateCoordinator {
    * Step 4: Fact-check the arguments
    */
   async factCheckArguments(
+    paper: Paper,
     debaterArguments: DebaterArgument[]
   ): Promise<FactCheckSummary> {
     const factCheck = await this.factCheckerAgent.checkFacts({
+      paper,
       arguments: debaterArguments,
     });
     return factCheck;
@@ -194,7 +196,7 @@ export class DebateCoordinator {
 
       // Step 3: Fact-check arguments
       onProgress?.("Fact-checking arguments...");
-      const factCheck = await this.factCheckArguments(debaterArguments);
+      const factCheck = await this.factCheckArguments(paper, debaterArguments);
       onProgress?.("factcheck_complete", { factCheck });
 
       // Step 4: Judge debate (with fact-check results)

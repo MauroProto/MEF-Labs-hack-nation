@@ -186,7 +186,7 @@ than architectures based on recurrent or convolutional layers.
 
     // Test 4: Fact-Check Arguments
     console.log('🔍 Step 4: Fact-checking arguments...');
-    const factCheck = await coordinator.factCheckArguments(debaterArguments);
+    const factCheck = await coordinator.factCheckArguments(samplePaper, debaterArguments);
     console.log(`✅ Fact-checking complete!\n`);
 
     // Display fact-check summary
