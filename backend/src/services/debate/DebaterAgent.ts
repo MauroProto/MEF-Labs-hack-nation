@@ -3,10 +3,11 @@ import { BaseDebateAgent } from "./BaseDebateAgent";
 import {
   DebaterRequest,
   DebaterArgument,
-  WebSearchResult,
   LookupHit,
   Paper,
+  WebSearchResult,
 } from "../../types/debate.types";
+import { webSearch } from "./webSearchService";
 
 export class DebaterAgent extends BaseDebateAgent {
   private paper!: Paper;
@@ -17,27 +18,95 @@ export class DebaterAgent extends BaseDebateAgent {
 
     const systemPrompt = `${this.getSystemPrompt()}
 
-You are Debater "${posture}". You must address every topic in the provided list from the perspective of your posture.
+### ROLE
 
-You may call lookupPaper(query) to fetch relevant paper chunks.
-You may call webSearch(query) to find high-quality external sources.
+    You are the **Debater Agent** defending the following *posture*:
 
-For each topic: make a clear claim, give reasoning, and cite evidence. Then produce a short overallPosition.
+> "${posture}"
 
-Output ONLY valid JSON that conforms to this schema:
+Your task is to debate the question:
+
+> "${question}"
+
+### MATERIALS
+
+You share access to the same research paper and set of discussion topics as other debaters:
+
+${JSON.stringify(topics, null, 2)}
+
+You can call:
+- **lookupPaper(query)** to read any part of the paper
+- **webSearch(query)** to find relevant information online
+
+### OUTPUT FORMAT
+
+Return JSON that matches this schema:
+
 {
   "posture": string,
-  "perTopic": [{
-    "topic": string,
-    "claim": string,
-    "reasoning": string,
-    "cites": {
-      "paper": [{ "chunkId": string, "text": string, "score": number }],
-      "web": [{ "title": string, "url": string, "snippet": string }]
+  "perTopic": [
+    {
+      "topic": string,
+      "claim": string,
+      "reasoning": string,
+      "counterpoints": string[],
+      "citations": {
+        "paper": LookupHit[] | [],
+        "web": WebSearchResult[] | []
+      }
     }
-  }],
+  ],
   "overallPosition": string
-}`;
+}
+
+### WRITING STRATEGY
+
+For each topic:
+
+1. **Interpret the topic's connection** to your posture. Clarify how it influences or constrains your stance.
+
+2. **Make a claim**: concise, assertive statement (1–2 sentences).
+
+3. **Develop reasoning**: explain why the claim follows logically. Include:
+   - Causal logic (if relevant)
+   - Conceptual or ethical implications
+   - Tensions, trade-offs, or conditions
+
+4. **Add 1–2 counterpoints** that a rival debater might raise, and *briefly pre-empt* them.
+
+5. Optionally call \`lookupPaper\` or \`webSearch\` if you need context to reinforce reasoning.
+
+6. Keep coherence: all topics must be logically compatible with the same posture.
+
+### STYLE
+
+- Aim for *conceptual richness* over verbosity.
+- Avoid repeating the same logic across topics.
+- Avoid unverifiable claims; use reasoning rather than "facts."
+- Explicitly connect reasoning threads between topics (helps the Judge score cohesion).
+
+### EXAMPLE (simplified)
+
+For topic "methodology bias":
+- claim: "The study's reliance on self-reported data weakens the causal inference."
+- reasoning: "Because participants might distort recall accuracy, the correlation found may reflect perception, not behavior."
+- counterpoints: ["Self-report captures lived experience", "Bias may average out statistically"]
+
+### SELF-CHECK PHASE
+
+Before finalizing, conduct a **self-review**:
+
+1. **Completeness** – Have you covered all topics with distinct reasoning?
+
+2. **Cohesion** – Do your arguments logically align with one another?
+
+3. **Posture Consistency** – Have you consistently defended your stance?
+
+4. **Revision Summary** – Note any refinements or logic fixes you made.
+
+### END TASK
+
+Produce a complete JSON following the schema and using all topics.`;
 
     const userPrompt = `Question: ${question}
 
@@ -74,13 +143,13 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
         function: {
           name: "webSearch",
           description:
-            "Search the web for external sources and evidence. Returns relevant web results.",
+            "Search the web for additional context, recent developments, or supporting evidence. Returns relevant web results with titles, URLs, and snippets.",
           parameters: {
             type: "object",
             properties: {
               query: {
                 type: "string",
-                description: "The search query to find relevant web sources",
+                description: "The search query to find relevant information on the web",
               },
             },
             required: ["query"],
@@ -141,7 +210,7 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
 
       for (const toolCall of toolCalls) {
         if (toolCall.type !== "function") continue;
-        
+
         const toolName = toolCall.function.name;
         const toolInput = JSON.parse(toolCall.function.arguments);
 
@@ -149,17 +218,21 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
 
         if (toolName === "lookupPaper") {
           result = await this.lookupPaper(toolInput.query);
-        } else if (toolName === "webSearch") {
-          result = await this.webSearch(toolInput.query);
-        } else {
-          result = { error: "Unknown tool" };
-        }
 
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
-        });
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
+        } else if (toolName === "webSearch") {
+          result = await webSearch(toolInput.query);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
+        }
       }
     }
 
@@ -211,21 +284,5 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
     return chunks.sort((a, b) => b.score - a.score).slice(0, 5);
   }
 
-  private async webSearch(query: string): Promise<WebSearchResult[]> {
-    console.log('[DebaterAgent] Web searching for:', query);
-
-    return [
-      {
-        title: `Research on: ${query}`,
-        url: `https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`,
-        snippet: `Mock search result for "${query}". In production, this would return real web search results from academic databases and search engines.`,
-      },
-      {
-        title: `${query} - Academic Review`,
-        url: `https://www.semanticscholar.org/search?q=${encodeURIComponent(query)}`,
-        snippet: `Additional context and research findings related to ${query}. This demonstrates the web search capability.`,
-      },
-    ];
-  }
 }
 

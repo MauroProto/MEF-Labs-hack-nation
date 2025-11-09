@@ -27,7 +27,7 @@ const POSTURE_COLORS = [
 ];
 
 export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateViewerProps) {
-  const [selectedTopic, setSelectedTopic] = useState(0);
+  const [selectedTab, setSelectedTab] = useState("0");
 
   return (
     <div className="space-y-4">
@@ -45,20 +45,25 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
       </Card>
 
       {/* Topics Tabs */}
-      <Tabs value={selectedTopic.toString()} onValueChange={(v) => setSelectedTopic(parseInt(v))}>
-        <TabsList className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+        <TabsList className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:flex lg:flex-wrap gap-2 h-auto">
           {report.topics.map((topic, index) => (
-            <TabsTrigger key={index} value={index.toString()} className="text-sm">
+            <TabsTrigger
+              key={index}
+              value={index.toString()}
+              className="text-xs sm:text-sm whitespace-normal text-center h-auto py-2 px-2"
+            >
               {topic}
             </TabsTrigger>
           ))}
+          <TabsTrigger value="verdict" className="text-xs sm:text-sm bg-amber-50 whitespace-normal text-center h-auto py-2 px-2">
+            Final Verdict
+          </TabsTrigger>
         </TabsList>
 
         {/* Topic Content */}
         {report.topics.map((topic, topicIndex) => (
-          <TabsContent key={topicIndex} value={topicIndex.toString()} className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{topic}</h3>
-
+          <TabsContent key={topicIndex} value={topicIndex.toString()} className="space-y-4 mt-4">
             {/* Debaters' Arguments for this Topic */}
             <div className="space-y-4">
               {debaterArgs?.map((arg, debaterIndex) => {
@@ -81,17 +86,10 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
                   <Card key={debaterIndex} className={`p-4 border-2 ${colorClass}`}>
                     {/* Posture Header */}
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={colorClass}>
-                          {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📍'}{' '}
-                          {arg.posture}
-                        </Badge>
-                        {debaterVerdict && (
-                          <span className="text-sm font-medium text-gray-600">
-                            Overall: {Math.round(debaterVerdict.totals.weighted)}/100
-                          </span>
-                        )}
-                      </div>
+                      <Badge variant="outline" className={colorClass}>
+                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📍'}{' '}
+                        {arg.posture}
+                      </Badge>
                     </div>
 
                     {/* Claim */}
@@ -182,10 +180,6 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
         ))}
 
         {/* Final Verdict Tab */}
-        <TabsList className="mt-4">
-          <TabsTrigger value="verdict">Final Verdict</TabsTrigger>
-        </TabsList>
-
         <TabsContent value="verdict" className="space-y-4">
           {/* Summary */}
           <Card className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">

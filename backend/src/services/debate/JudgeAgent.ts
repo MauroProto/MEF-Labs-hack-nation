@@ -7,41 +7,128 @@ import {
 
 export class JudgeAgent extends BaseDebateAgent {
   async judge(request: JudgeRequest): Promise<JudgeVerdict> {
-    const { question, topics, arguments: debaterArguments, rubric } = request;
+    const { question, topics, arguments: debaterArguments, rubric, factCheck } = request;
+
+    const postures = debaterArguments.map(arg => arg.posture);
+
+    const factCheckInfo = factCheck ? `
+
+### FACT-CHECK RESULTS
+
+The Fact-Checker Agent has verified the factual claims. Use these results to inform your evaluation:
+
+${JSON.stringify(factCheck, null, 2)}
+
+**Important**: Consider factual accuracy when scoring, especially for the "value" criterion. Arguments with verified facts should score higher than those with false or unverifiable claims.` : '';
 
     const systemPrompt = `${this.getSystemPrompt()}
 
-Score each debater per topic using the provided rubric. Scores are within [0,1]. Include notes explaining deductions. Then compute weighted totals and select a bestOverall posture, and list insights (novel, actionable, non-obvious) that are well-supported across arguments.
+### ROLE
 
-Output ONLY valid JSON that conforms to this schema:
+You are the **Judge Agent** in a multi-agent debate.
+
+Your task is to assess how well each Debater's arguments perform across shared topics.
+
+### MATERIALS
+
+- Question: "${question}"
+- Topics: ${JSON.stringify(topics, null, 2)}
+- Postures: ${JSON.stringify(postures, null, 2)}
+
+### IMPORTANT NOTE
+
+You are evaluating *language-model arguments*, not human essays.
+
+Therefore, your judgment focuses on:
+
+- **Value**: Does the argument provide meaningful, non-trivial insights?
+- **Cohesiveness**: Are all topics and reasoning threads logically compatible and internally consistent?
+- **Conceptual Soundness**: Do arguments make sense, avoiding contradictions or logical fallacies?
+- **Relevance**: Does each argument actually address the assigned topic and question?
+- **Clarity**: Are statements precise, avoiding vague or circular explanations?
+
+You are **not** verifying sources, checking URLs, or validating factual claims.
+Another agent handles source validity.
+
+### RUBRIC
+
+Use this rubric to score each Debater **per topic**:
+
+| Criterion | Description | Range | Weight |
+|------------|--------------|--------|--------|
+| value | Conceptual or argumentative richness; non-triviality | 0–1 | 0.30 |
+| cohesiveness | Internal logic and compatibility across topics | 0–1 | 0.25 |
+| relevance | Focused on the topic and question | 0–1 | 0.20 |
+| clarity | Precision and readability of reasoning | 0–1 | 0.15 |
+| engagement | Responds to counterpoints, anticipates critique | 0–1 | 0.10 |
+
+### SCORING GUIDELINES
+
+Use the full range from 0.0 to 1.0 for each criterion:
+
+- **0.9-1.0** = Exceptional (outstanding evidence, flawless logic, comprehensive coverage)
+- **0.7-0.9** = Strong (good evidence, solid reasoning, thorough)
+- **0.5-0.7** = Adequate (some evidence, decent reasoning, partial coverage)
+- **0.3-0.5** = Weak (limited evidence, flawed reasoning, gaps)
+- **0.0-0.3** = Poor (no evidence, faulty logic, minimal coverage)
+
+**Be discerning but fair.** Well-argued positions with good evidence should score 0.7-0.9. Only perfect arguments deserve 1.0.
+
+Each score is between 0 and 1.
+Compute the **weighted average** for each topic, then an **overall score** per debater (mean of topic scores).
+Rank debaters from best to worst.
+Extract the **most valuable insights** (non-obvious conclusions, new syntheses, or reconciling ideas).
+
+### OUTPUT FORMAT
+
+Return a JSON object following this schema:
+
 {
-  "perDebater": [{
-    "posture": string,
-    "perTopic": [{
-      "topic": string,
-      "scores": {
-        "correctness": number,
-        "evidence": number,
-        "coverage": number,
-        "clarity": number,
-        "novelty": number
-      },
-      "notes": string
-    }],
-    "totals": {
-      "weighted": number,
-      "byCriterion": {
-        "correctness": number,
-        "evidence": number,
-        "coverage": number,
-        "clarity": number,
-        "novelty": number
+  "perDebater": [
+    {
+      "posture": string,
+      "perTopic": [
+        {
+          "topic": string,
+          "scores": {
+            "value": number,
+            "cohesiveness": number,
+            "relevance": number,
+            "clarity": number,
+            "engagement": number
+          },
+          "notes": string
+        }
+      ],
+      "totals": {
+        "weighted": number,
+        "byCriterion": {
+          "value": number,
+          "cohesiveness": number,
+          "relevance": number,
+          "clarity": number,
+          "engagement": number
+        }
       }
     }
-  }],
+  ],
   "bestOverall": string,
-  "insights": string[]
-}`;
+  "insights": string[],
+  "controversialPoints": string[]
+}
+
+### EVALUATION GUIDELINES
+
+1. **Topic-level**: Assess if each topic section makes logical sense and contributes unique perspective.
+2. **Cross-topic cohesion**: Penalize when reasoning contradicts itself across topics.
+3. **Posture faithfulness**: Debater must remain loyal to their assigned posture.
+4. **Insight extraction**: Identify arguments that bridge multiple postures or reveal deeper conceptual understanding.
+5. **Avoid bias**: Judge only based on structure and reasoning, not on your own beliefs.
+6. **Score distribution**: Use the full 0.0-1.0 range. Good arguments should score 0.7-0.9, not all clustering around 0.5.
+
+### END TASK
+
+Return a valid JSON object following the schema above. Do not add extra commentary.${factCheckInfo}`;
 
     const rubricText = rubric
       .map(
@@ -53,15 +140,18 @@ Output ONLY valid JSON that conforms to this schema:
       .map((arg) => {
         const topicsText = arg.perTopic
           .map((pt) => {
-            const paperCites = pt.cites.paper
-              ? `\n    Paper citations: ${pt.cites.paper.length} chunks`
+            const counterpoints = pt.counterpoints && pt.counterpoints.length > 0
+              ? `\n    Counterpoints: ${pt.counterpoints.join('; ')}`
               : "";
-            const webCites = pt.cites.web
-              ? `\n    Web citations: ${pt.cites.web.length} sources`
+            const paperCites = pt.citations.paper
+              ? `\n    Paper citations: ${pt.citations.paper.length} chunks`
+              : "";
+            const webCites = pt.citations.web
+              ? `\n    Web citations: ${pt.citations.web.length} sources`
               : "";
             return `  - Topic: ${pt.topic}
     Claim: ${pt.claim}
-    Reasoning: ${pt.reasoning}${paperCites}${webCites}`;
+    Reasoning: ${pt.reasoning}${counterpoints}${paperCites}${webCites}`;
           })
           .join("\n\n");
 
@@ -99,4 +189,3 @@ Evaluate each debater's argument for each topic using the rubric. Provide scores
     return response;
   }
 }
-
