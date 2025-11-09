@@ -185,6 +185,26 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
                           {debater.status === 'complete' && 'Complete'}
                           {debater.status === 'error' && `Error: ${debater.error}`}
                         </p>
+
+                        {/* Show argument preview when complete */}
+                        {debater.status === 'complete' && debater.argument && (
+                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                            <p className="font-semibold text-green-900 mb-1">Opening Statement:</p>
+                            <p className="text-gray-700 line-clamp-3 mb-2">
+                              {debater.argument.openingStatement}
+                            </p>
+                            {debater.argument.topicArguments && debater.argument.topicArguments.length > 0 && (
+                              <>
+                                <p className="font-semibold text-green-900 mb-1">
+                                  Topic 1 - {debater.argument.topicArguments[0].topic}:
+                                </p>
+                                <p className="text-gray-700 line-clamp-2">
+                                  {debater.argument.topicArguments[0].argument}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
