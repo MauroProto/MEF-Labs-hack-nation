@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { BaseNode } from './BaseNode';
 import { Send, FileText, MessageCircle, Loader2, Link2 } from 'lucide-react';
 import { usePaperContextStore } from '@/lib/stores/paperContextStore';
@@ -28,37 +28,43 @@ interface PaperChatNodeProps {
   selected?: boolean;
 }
 
-export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
+function PaperChatNodeComponent({ id, data, selected }: PaperChatNodeProps) {
   const [messages, setMessages] = useState<Message[]>(data.messages || []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initialMessageSentRef = useRef(false);
 
-  const { getPaperForNode } = usePaperContextStore();
+  // Optimized Zustand selectors - separate calls to avoid infinite loop
+  const getPaperForNode = usePaperContextStore((s) => s.getPaperForNode);
   const connectedPaper = getPaperForNode(id);
 
   // Debate context store for debate-to-chat connections
-  const { getDebateForNode } = useDebateContextStore();
+  const getDebateForNode = useDebateContextStore((s) => s.getDebateForNode);
   const connectedDebate = getDebateForNode(id);
 
-  // Chat context store for chat-to-chat connections
-  const { updateConversation, getUpstreamChats } = useChatContextStore();
+  // Chat context store - separate selectors
+  const updateConversation = useChatContextStore((s) => s.updateConversation);
+  const getUpstreamChats = useChatContextStore((s) => s.getUpstreamChats);
   const upstreamChats = getUpstreamChats(id);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Update conversation in store whenever messages change
+  // Debounced update to conversation store - reduces unnecessary updates
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length === 0) return;
+
+    const timeoutId = setTimeout(() => {
       updateConversation(
         id,
         messages,
         connectedPaper ? { paperId: connectedPaper.id, title: connectedPaper.title } : undefined
       );
-    }
+    }, 500); // Debounce by 500ms
+
+    return () => clearTimeout(timeoutId);
   }, [messages, id, connectedPaper, updateConversation]);
 
   // Auto-send initial message if provided
@@ -176,6 +182,16 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Debug logging
+      console.log('[PaperChatNode] Sending message');
+      console.log('[PaperChatNode] Has connectedPaper:', !!connectedPaper);
+      console.log('[PaperChatNode] Has connectedDebate:', !!connectedDebate);
+      if (connectedDebate) {
+        console.log('[PaperChatNode] Debate ID:', connectedDebate.id);
+        console.log('[PaperChatNode] Debate questions:', connectedDebate.questions);
+        console.log('[PaperChatNode] Markdown length:', connectedDebate.markdown?.length);
+      }
 
       try {
         const response = await fetch('/api/chat', {
@@ -340,7 +356,7 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={connectedPaper || upstreamChats.length > 0 ? 'Escribe tu pregunta…' : 'Escribe tu mensaje…'}
+              placeholder={connectedPaper || upstreamChats.length > 0 ? 'Type your question…' : 'Type your message…'}
               disabled={loading}
               className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400"
             />
@@ -348,7 +364,7 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
               type="submit"
               disabled={!input.trim() || loading}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:bg-gray-300"
-              title="Enviar"
+              title="Send"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             </button>
@@ -358,3 +374,6 @@ export function PaperChatNode({ id, data, selected }: PaperChatNodeProps) {
     </BaseNode>
   );
 }
+
+// Export memoized version to prevent unnecessary re-renders
+export const PaperChatNode = memo(PaperChatNodeComponent);

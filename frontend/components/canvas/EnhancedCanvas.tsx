@@ -41,6 +41,8 @@ const initialEdges: Edge[] = [];
 function EnhancedCanvasInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Optimized Zustand selectors - separate calls to avoid infinite loop
   const connectNodeToPaper = usePaperContextStore((s) => s.connectNodeToPaper);
   const getPaperForNode = usePaperContextStore((s) => s.getPaperForNode);
   const paperConnections = usePaperContextStore((s) => s.paperConnections);
@@ -53,10 +55,23 @@ function EnhancedCanvasInner() {
   const connectChatToChat = useChatContextStore((s) => s.connectChatToChat);
 
   // MiniMap visibility state
-  const [showMiniMap, setShowMiniMap] = useState(true);
+  const [showMiniMap, setShowMiniMap] = useState(false);
 
   // Get React Flow instance for viewport-aware positioning and deletion
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+  const hasInitialFitRef = React.useRef(false);
+  useEffect(() => {
+    if (nodes.length === 0) {
+      hasInitialFitRef.current = false;
+      return;
+    }
+    if (!hasInitialFitRef.current) {
+      requestAnimationFrame(() => {
+        fitView({ padding: 0.2, duration: 300 });
+      });
+      hasInitialFitRef.current = true;
+    }
+  }, [nodes.length, fitView, hasInitialFitRef]);
 
   // Define custom node types
   const nodeTypes: NodeTypes = useMemo(() => NODE_COMPONENTS, []);
@@ -279,14 +294,13 @@ function EnhancedCanvasInner() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
-        fitView
         minZoom={0.2}
         maxZoom={1.5}
         deleteKeyCode="Delete"
         panOnScroll
         panOnDrag={false}
         selectionOnDrag={false}
-        onlyRenderVisibleElements
+        onlyRenderVisibleElements={true}
         defaultViewport={defaultViewport}
         translateExtent={translateExtent}
         proOptions={{ hideAttribution: true }}
@@ -297,6 +311,14 @@ function EnhancedCanvasInner() {
         edgesFocusable
         elementsSelectable
         selectNodesOnDrag={false}
+        // Performance optimizations
+        autoPanOnNodeDrag={false}
+        autoPanOnConnect={false}
+        connectionLineType="default"
+        fitViewOptions={{ padding: 0.2 }}
+        // Reduce re-renders
+        zoomOnDoubleClick={false}
+        preventScrolling={true}
       >
         <Background color="#e5e7eb" gap={16} size={0.5} />
 

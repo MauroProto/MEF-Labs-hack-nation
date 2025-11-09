@@ -38,18 +38,6 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
     setNumPages(numPages);
   }, []);
 
-  // Utility to clamp a point inside the container bounds with padding
-  const clampToContainer = useCallback((x: number, y: number) => {
-    const el = containerRef.current;
-    if (!el) return { x, y };
-    const rect = el.getBoundingClientRect();
-    const pad = 8;
-    const minX = pad;
-    const minY = pad;
-    const maxX = rect.width - pad;
-    const maxY = rect.height - pad;
-    return { x: Math.max(minX, Math.min(maxX, x)), y: Math.max(minY, Math.min(maxY, y)) };
-  }, []);
 
   // Check for text selection with a small delay
   const updateButtonFromSelection = useCallback(() => {
@@ -81,21 +69,31 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
 
       lastSelectionRectRef.current = rect;
 
-      // Position near selection top-right within container (stable & consistent)
-      const relX = rect.right - containerRect.left - 6;
-      const relY = rect.top - containerRect.top - 28;
-      const clamped = clampToContainer(relX, relY);
+      // Position below the selection, centered horizontally
+      // Account for container scroll position
+      const container = containerRef.current;
+      if (!container) return;
+
+      const buttonWidth = 150; // Approximate button width
+      const scrollTop = container.scrollTop;
+      const scrollLeft = container.scrollLeft;
+
+      // Calculate position relative to the container's content (including scroll)
+      const centerX = (rect.left + rect.right) / 2 - containerRect.left + scrollLeft - (buttonWidth / 2);
+      const relX = centerX;
+      const relY = rect.bottom - containerRect.top + scrollTop + 8; // 8px below selection
+
       setSelectedText(text);
       selectedTextRef.current = text;
-      setButtonPosition(clamped);
+      setButtonPosition({ x: relX, y: relY });
     } catch {
       // Selection rect unavailable, skip button positioning
     }
-  }, [clampToContainer]);
+  }, []);
 
   const checkSelection = useCallback(() => {
     if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current);
-    selectionTimerRef.current = setTimeout(updateButtonFromSelection, 120);
+    selectionTimerRef.current = setTimeout(updateButtonFromSelection, 50);
   }, [updateButtonFromSelection]);
 
   // Mark selecting on mouse/pointer down so we don't reposition the button mid-drag
@@ -142,13 +140,21 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
       try {
         const range = sel.getRangeAt(0);
         const rect = range.getBoundingClientRect();
-        const containerRect = containerRef.current?.getBoundingClientRect();
-        if (!rect || !containerRect) return;
+        const container = containerRef.current;
+        const containerRect = container?.getBoundingClientRect();
+        if (!rect || !containerRect || !container) return;
+
         lastSelectionRectRef.current = rect;
-        const relX = rect.right - containerRect.left - 6;
-        const relY = rect.top - containerRect.top - 28;
-        const clamped = clampToContainer(relX, relY);
-        setButtonPosition(clamped);
+        const buttonWidth = 150;
+        const scrollTop = container.scrollTop;
+        const scrollLeft = container.scrollLeft;
+
+        // Calculate position relative to the container's content (including scroll)
+        const centerX = (rect.left + rect.right) / 2 - containerRect.left + scrollLeft - (buttonWidth / 2);
+        const relX = centerX;
+        const relY = rect.bottom - containerRect.top + scrollTop + 8;
+
+        setButtonPosition({ x: relX, y: relY });
       } catch {}
     };
 
@@ -162,7 +168,7 @@ export function PDFViewer({ fileUrl, onAskAboutSelection }: PDFViewerProps) {
       containerRef.current?.removeEventListener('scroll', handleScrollOrResize as any);
       if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current);
     };
-  }, [checkSelection, clampToContainer, isSelecting]);
+  }, [checkSelection, isSelecting]);
 
   // Update button position after mouse up
   const handleMouseUp = useCallback(() => {

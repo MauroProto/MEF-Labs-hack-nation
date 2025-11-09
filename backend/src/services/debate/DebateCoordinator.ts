@@ -598,6 +598,27 @@ export class DebateCoordinator {
       });
       md += `\n`;
 
+      // Add initial arguments
+      md += `### Initial Arguments\n\n`;
+      result.initialArguments.forEach((arg, argIdx) => {
+        md += `#### ${result.postures[argIdx]}\n\n`;
+        if (arg.perTopic && arg.perTopic.length > 0) {
+          arg.perTopic.forEach((topic) => {
+            md += `**${topic.topic}**\n\n`;
+            if (topic.claim) {
+              md += `*Claim:* ${topic.claim}\n\n`;
+            }
+            if (topic.reasoning) {
+              md += `${topic.reasoning}\n\n`;
+            }
+          });
+        }
+        if (arg.overallPosition) {
+          md += `*Overall Position:* ${arg.overallPosition}\n\n`;
+        }
+        md += `---\n\n`;
+      });
+
       md += `### Debate Rounds\n\n`;
       result.rounds.forEach((round) => {
         md += `#### Round ${round.roundNumber}\n\n`;

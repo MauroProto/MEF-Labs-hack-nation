@@ -1,322 +1,611 @@
 # Research Agent Canvas
 
-Visual multi-agent AI system for collaborative scientific paper analysis where agents can discover, call, and use each other as tools (MCP-like architecture).
+A visual, node-based platform for AI-powered collaborative research paper analysis. Build intelligent workflows by connecting specialized nodes that analyze, debate, and synthesize insights from scientific papers using multi-agent systems.
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-blue)
+![Next.js](https://img.shields.io/badge/Next.js-16.0.1-black)
+![React](https://img.shields.io/badge/React-19.2.0-blue)
+
+## Overview
+
+Research Agent Canvas transforms research paper analysis into an interactive, visual experience. Instead of traditional linear workflows, researchers can create dynamic analysis pipelines by dragging nodes onto a canvas and connecting them to share context and insights.
+
+The platform leverages multiple specialized AI agents that can work independently or collaborate through debates, providing diverse perspectives on research questions and helping researchers uncover insights they might have missed.
+
+## Key Features
+
+### Visual Node-Based Interface
+- **14 Node Types** organized in 4 categories: Input, Research, Agent, and Visualization
+- **Drag-and-drop** workflow creation with automatic context propagation
+- **Live connection** system that automatically shares data between connected nodes
+- **Real-time updates** with streaming responses and live debate visualization
+
+### Multi-Agent Debate System
+The standout feature of the platform is the Academic Debate node, which orchestrates multi-agent debates:
+- **3 AI Agents** with different perspectives debate research questions simultaneously
+- **Real-time streaming** of arguments, questions, and responses across all agents
+- **Multiple Q&A rounds** where agents cross-examine each other's positions
+- **Automated judging** with detailed scoring, rankings, and consensus findings
+- **Full transcript export** in markdown format with all arguments and evaluations
+
+### Intelligent Context Sharing
+Nodes automatically share context when connected:
+- **Paper Upload → Chat**: Ask questions about specific papers with full text context
+- **Debate → Chat**: Query debate results and explore different perspectives
+- **Chat → Chat**: Build conversation chains that reference previous discussions
+- All context sharing happens automatically through the visual connections
+
+### Specialized AI Agents
+- **Researcher Agent**: Deep analysis, claim extraction, methodology review
+- **Critic Agent**: Validates claims, identifies biases and weaknesses
+- **Synthesizer Agent**: Merges multiple analyses and resolves conflicts
+- **Question Generator**: Creates research questions and suggests experiments
+- **Citation Tracker**: Verifies citations and builds citation networks
+
+### PDF Processing
+- **Client-side extraction** using pdf.js (no server upload required)
+- **Automatic parsing** of title, authors, abstract, and full text
+- **Metadata extraction** from paper structure
+- Supports papers up to 12 pages for optimal performance
 
 ## Tech Stack
 
 ### Frontend
-- Next.js 16.0.0 with App Router
-- React 19.2.0
-- TypeScript 5.9.3
-- shadcn/ui (Radix UI primitives)
-- @xyflow/react 12.8.5 (canvas system)
-- Zustand 5.0.8 (state management)
-- Tailwind CSS 4.0
-- Socket.io-client 4.8.1
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Next.js** | 16.0.1 | React framework with Turbopack |
+| **React** | 19.2.0 | UI library |
+| **TypeScript** | 5.9.3 | Type safety |
+| **@xyflow/react** | 12.8.5 | Visual canvas and node system |
+| **Zustand** | 5.0.8 | State management |
+| **Tailwind CSS** | 3.4.0 | Styling |
+| **shadcn/ui** | - | UI component library |
+| **pdfjs-dist** | 4.8.69 | PDF text extraction |
+| **Socket.io Client** | 4.8.1 | WebSocket communication |
+| **React Markdown** | 10.1.0 | Markdown rendering |
 
 ### Backend
-- Node.js >=20.0.0
-- Express 4.21.2
-- PostgreSQL 16 (Docker)
-- Prisma ORM 6.16.0
-- OpenAI 6.7.0 (GPT-4o-mini)
-- Socket.io 4.8.1
-- Custom EventEmitter-based agent orchestration
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Node.js** | ≥20.0.0 | Runtime environment |
+| **Express** | 4.21.2 | Web framework |
+| **TypeScript** | 5.9.3 | Type safety |
+| **PostgreSQL** | 16 | Database |
+| **Prisma** | 6.16.0 | ORM and migrations |
+| **OpenAI API** | 6.7.0 | AI language models |
+| **Socket.io** | 4.8.1 | WebSocket server |
+| **Zod** | 3.23.8 | Schema validation |
 
-### Agent Communication
-- Node.js EventEmitter (in-process event bus)
-- WebSocket (Socket.io) for real-time UI updates
-- JSON-RPC 2.0 style messaging
-- Zod 3.23.8 for schema validation
-- Custom orchestrator with cycle detection
+### Development Tools
+- **pnpm** 9.15.0 - Fast, disk space efficient package manager
+- **Turbo** 2.6.0 - Monorepo build system
+- **tsx** 4.15.6 - TypeScript execution for Node.js
+- **Docker** - PostgreSQL containerization
 
-## Prerequisites
+## Architecture
 
-- Node.js >=20.0.0
-- pnpm 9.15.0 (required)
-- Docker 24+ and Docker Compose 2+
-- OpenAI API key
-- Tavily API key (for web search)
+### Frontend Architecture
 
-## Quick Start
-
-### 1. Clone and Install
-
-```bash
-# Install pnpm globally if you haven't
-npm install -g pnpm@9.15.0
-
-# Install dependencies
-pnpm install
+```
+┌─────────────────────────────────────────────────┐
+│                 Next.js App                      │
+│  ┌───────────────────────────────────────────┐  │
+│  │         React Flow Canvas                  │  │
+│  │  ┌────────┐  ┌────────┐  ┌────────┐       │  │
+│  │  │ Paper  │──│  Chat  │──│ Debate │       │  │
+│  │  │ Upload │  │  Node  │  │  Node  │       │  │
+│  │  └────────┘  └────────┘  └────────┘       │  │
+│  └───────────────────────────────────────────┘  │
+│                                                  │
+│  ┌───────────────────────────────────────────┐  │
+│  │         Zustand State Stores               │  │
+│  │  • paperContextStore                       │  │
+│  │  • debateContextStore                      │  │
+│  │  • chatContextStore                        │  │
+│  │  • canvasStore                             │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+              │
+              │ WebSocket / HTTP
+              ▼
+┌─────────────────────────────────────────────────┐
+│              Express Backend                     │
+│  ┌───────────────────────────────────────────┐  │
+│  │       Debate Coordinator                   │  │
+│  │  ┌─────────────────────────────────────┐  │  │
+│  │  │  PostureGenerator → DebaterAgent    │  │  │
+│  │  │  QuestionerAgent ⇄ ResponseAgent    │  │  │
+│  │  │  JudgeAgent → ReporterAgent         │  │  │
+│  │  └─────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────┘  │
+│                                                  │
+│  ┌───────────────────────────────────────────┐  │
+│  │         PostgreSQL (Prisma)                │  │
+│  │  • Papers, Canvas, Debates                 │  │
+│  │  • Agent registry and messages             │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
 ```
 
-### 2. Setup Environment Variables
+### State Management
 
-```bash
-# Backend
-cp backend/.env.example backend/.env
-# Edit backend/.env and add your API keys:
-# - OPENAI_API_KEY
-# - TAVILY_API_KEY
+The frontend uses **Zustand** stores for different contexts:
 
-# Frontend
-cp frontend/.env.example frontend/.env.local
+- **`paperContextStore`**: Manages uploaded papers and paper-to-node connections
+- **`debateContextStore`**: Stores debate results and debate-to-node connections
+- **`chatContextStore`**: Manages chat history and upstream conversation chains
+- **`canvasStore`**: Canvas state including nodes, edges, and viewport
+
+### Real-time Communication
+
+- **Server-Sent Events (SSE)**: Backend streams debate progress to frontend
+- **WebSocket (Socket.io)**: Real-time collaboration and canvas updates
+- **Custom hooks**: `useMasDebate` handles debate lifecycle and streaming state
+
+### Multi-Agent Debate Flow
+
+```
+1. PostureGenerator
+   └─> Creates 3 debate positions with specific topics and questions
+
+2. Initial Arguments (Parallel)
+   ├─> DebaterAgent (Posture 1) generates argument
+   ├─> DebaterAgent (Posture 2) generates argument
+   └─> DebaterAgent (Posture 3) generates argument
+
+3. Q&A Rounds (Sequential, 3 rounds)
+   ├─> Round 1
+   │   ├─> QuestionerAgent (each debater asks questions to others)
+   │   └─> ResponseAgent (each debater responds)
+   ├─> Round 2
+   │   ├─> QuestionerAgent
+   │   └─> ResponseAgent
+   └─> Round 3
+       ├─> QuestionerAgent
+       └─> ResponseAgent
+
+4. Judging
+   └─> JudgeAgent evaluates all arguments and exchanges
+       └─> Produces scores, rankings, and detailed verdict
+
+5. Report Generation
+   └─> ReporterAgent creates final markdown report
+       └─> Includes full transcript and downloadable document
 ```
 
-### 3. Start Database
+## Getting Started
 
-```bash
-# Start PostgreSQL with Docker
-docker-compose up -d
+### Prerequisites
 
-# Wait for database to be healthy
-docker-compose ps
-```
+- **Node.js** ≥ 20.0.0
+- **pnpm** 9.15.0 (required - do not use npm or yarn)
+- **Docker** (for PostgreSQL)
+- **OpenAI API key** ([Get one here](https://platform.openai.com/api-keys))
 
-### 4. Setup Prisma
+### Installation
 
-```bash
-# Generate Prisma client
-cd backend
-pnpm prisma:generate
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/research-agent-canvas.git
+   cd research-agent-canvas
+   ```
 
-# Run migrations
-pnpm prisma:migrate
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
 
-# (Optional) Seed database
-pnpm prisma:seed
-```
+3. **Set up environment variables**
 
-### 5. Start Development Servers
+   Create `frontend/.env.local`:
+   ```env
+   NEXT_PUBLIC_API_URL=http://localhost:4000
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
 
-```bash
-# From root directory, start both frontend and backend
-pnpm dev
+   Create `backend/.env`:
+   ```env
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/research_canvas?schema=public"
+   OPENAI_API_KEY=your_openai_api_key_here
+   PORT=4000
+   ```
 
-# Or start them separately:
-# Terminal 1 - Frontend (http://localhost:3000)
-cd frontend
-pnpm dev
+4. **Start PostgreSQL**
+   ```bash
+   docker-compose up -d
+   ```
 
-# Terminal 2 - Backend (http://localhost:4000)
-cd backend
-pnpm dev
-```
+5. **Initialize the database**
+   ```bash
+   cd backend
+   pnpm prisma generate
+   pnpm prisma migrate dev
+   cd ..
+   ```
+
+6. **Start development servers**
+   ```bash
+   pnpm dev
+   ```
+
+   This starts both servers in parallel using Turbo:
+   - **Frontend**: http://localhost:3000
+   - **Backend**: http://localhost:4000
 
 ## Project Structure
 
 ```
 research-agent-canvas/
-├── frontend/              # Next.js 16 App
-│   ├── app/              # App Router pages
-│   ├── components/       # React components
-│   │   ├── canvas/       # Canvas components
-│   │   ├── nodes/        # Node types (13 types)
-│   │   └── ui/           # shadcn/ui components
-│   └── lib/              # Utilities, stores, hooks
-│       ├── stores/       # Zustand stores
-│       ├── hooks/        # Custom hooks
-│       └── api/          # API client
-├── backend/              # Express API
+├── frontend/                      # Next.js application
+│   ├── app/
+│   │   ├── api/
+│   │   │   └── chat/             # Chat API route with context support
+│   │   ├── page.tsx              # Main canvas page
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── canvas/
+│   │   │   └── EnhancedCanvas.tsx # Main canvas component
+│   │   ├── nodes/                # All 14 node implementations
+│   │   │   ├── PaperUploadNode.tsx
+│   │   │   ├── PaperChatNode.tsx
+│   │   │   ├── MasDebateNode.tsx
+│   │   │   ├── NoteNode.tsx
+│   │   │   ├── WebResearchNode.tsx
+│   │   │   ├── ResearcherAgentNode.tsx
+│   │   │   ├── CriticAgentNode.tsx
+│   │   │   ├── SynthesizerAgentNode.tsx
+│   │   │   ├── QuestionGeneratorNode.tsx
+│   │   │   └── CitationTrackerNode.tsx
+│   │   ├── debate/               # Debate visualization
+│   │   │   ├── LiveDebateView.tsx
+│   │   │   └── DebateTranscriptViewer.tsx
+│   │   ├── pdf/                  # PDF viewing components
+│   │   └── ui/                   # shadcn/ui components
+│   ├── lib/
+│   │   ├── stores/               # Zustand state management
+│   │   │   ├── paperContextStore.ts
+│   │   │   ├── debateContextStore.ts
+│   │   │   ├── chatContextStore.ts
+│   │   │   ├── canvasStore.ts
+│   │   │   └── noteContextStore.ts
+│   │   ├── hooks/
+│   │   │   ├── useMasDebate.ts   # Debate lifecycle hook
+│   │   │   └── useWebSocket.ts
+│   │   ├── api/                  # API client functions
+│   │   └── nodeTypes.ts          # Node type definitions
+│   └── package.json
+│
+├── backend/                       # Express API server
 │   ├── src/
-│   │   ├── index.ts      # Entry point
-│   │   ├── controllers/  # Request handlers
-│   │   ├── routes/       # API routes
-│   │   ├── services/     # Business logic
-│   │   │   ├── agentRegistry.ts    # Agent discovery
-│   │   │   ├── agentOrchestrator.ts # Agent coordination
-│   │   │   └── agentEventBus.ts    # EventEmitter bus
-│   │   └── lib/
-│   │       └── agents/   # 6 specialized AI agents
-│   └── prisma/
-│       └── schema.prisma # Database schema
-├── docker-compose.yml    # PostgreSQL container
-├── turbo.json           # Turborepo config
-└── pnpm-workspace.yaml  # pnpm workspace
+│   │   ├── controllers/
+│   │   │   ├── paperController.ts
+│   │   │   ├── canvasController.ts
+│   │   │   ├── masDebateController.ts
+│   │   │   └── agentController.ts
+│   │   ├── services/
+│   │   │   └── debate/           # Multi-agent debate system
+│   │   │       ├── DebateCoordinator.ts    # Orchestrates debates
+│   │   │       ├── PostureGenerator.ts     # Creates debate positions
+│   │   │       ├── DebaterAgent.ts         # Generates arguments
+│   │   │       ├── QuestionerAgent.ts      # Asks questions
+│   │   │       ├── ResponseAgent.ts        # Responds to questions
+│   │   │       ├── JudgeAgent.ts           # Evaluates arguments
+│   │   │       └── ReporterAgent.ts        # Creates final report
+│   │   ├── lib/
+│   │   │   ├── agents/           # Specialized research agents
+│   │   │   ├── prisma.ts
+│   │   │   └── websocket.ts
+│   │   ├── routes/
+│   │   │   ├── paperRoutes.ts
+│   │   │   ├── canvasRoutes.ts
+│   │   │   └── masDebateRoutes.ts
+│   │   ├── types/                # TypeScript definitions
+│   │   └── index.ts              # Express server
+│   ├── prisma/
+│   │   └── schema.prisma         # Database schema
+│   └── package.json
+│
+├── docker-compose.yml             # PostgreSQL container
+├── turbo.json                     # Monorepo configuration
+└── package.json                   # Root package.json
 ```
 
-## Available Scripts
+## Available Node Types
 
-### Root Level
-- `pnpm dev` - Start both frontend and backend
-- `pnpm build` - Build both apps
-- `pnpm lint` - Lint all workspaces
-- `pnpm type-check` - Type check all workspaces
-- `pnpm clean` - Clean all build artifacts
+### Input Nodes (Blue)
+- **Paper Upload**: Upload PDF files and extract text, metadata, and structure
+- **Note**: Create markdown notes and annotations
 
-### Frontend
-- `pnpm dev` - Start dev server (port 3000)
-- `pnpm build` - Build for production
-- `pnpm lint` - Run ESLint
+### Research Nodes (Green)
+- **Paper Chat**: Interactive AI conversation with paper context
+- **Web Research**: AI-powered web research with streaming responses
+- **Academic Debate**: Multi-agent debate system with 3 perspectives
 
-### Backend
-- `pnpm dev` - Start dev server with hot reload (port 4000)
-- `pnpm build` - Build TypeScript to dist/
-- `pnpm prisma:generate` - Generate Prisma client
-- `pnpm prisma:migrate` - Run database migrations
-- `pnpm prisma:studio` - Open Prisma Studio GUI
+### Agent Nodes (Purple)
+- **Researcher Agent**: Deep analysis and evidence extraction
+- **Critic Agent**: Claim validation and bias identification
+- **Synthesizer Agent**: Analysis merging and conflict resolution
+- **Question Generator**: Research question generation
+- **Citation Tracker**: Citation verification and network analysis
 
-## Database
+### Visualization Nodes (Orange)
+- **Citation Graph**: Citation network visualization
+- **Summary**: Paper summary generation
+- **Methodology**: Methodology extraction and analysis
+- **Results Visualization**: Research results visualization
+- **Insight Report**: Collective insights and findings
 
-### Schema Overview
+## Core Features
 
-The database includes 8 models:
-1. **User** - User accounts
-2. **Canvas** - Research canvas state (nodes + edges)
-3. **Paper** - Uploaded research papers with metadata
-4. **Agent** - Registry of active agents and capabilities
-5. **AgentMessage** - Agent communications and reasoning
-6. **AgentInvocation** - Agent-to-agent tool calls
-7. **AgentCapability** - Tool schemas by agent type
-8. **WebSearchResult** - Cached web search results
+### 1. PDF Processing Pipeline
 
-### Prisma Commands
-
-```bash
-# Generate Prisma client after schema changes
-pnpm prisma:generate
-
-# Create and apply a new migration
-pnpm prisma:migrate
-
-# Open Prisma Studio (database GUI)
-pnpm prisma:studio
-
-# Reset database (⚠️ deletes all data)
-pnpm prisma migrate reset
+```typescript
+// Client-side extraction in PaperUploadNode.tsx
+1. User uploads PDF → File API
+2. pdfjs loads document → ArrayBuffer
+3. Extract text from pages (limit: 12 pages)
+4. Parse metadata (title, authors, abstract)
+5. Store in paperContextStore
+6. Automatically connect to downstream nodes
 ```
 
-## Agent Communication Architecture
+### 2. Multi-Agent Debate Workflow
 
-The system uses a custom MCP-like protocol:
-
-1. **Agent Registry** - In-memory Map of active agents
-2. **EventEmitter Bus** - Zero-dependency event system
-3. **Orchestrator** - Routes invocations, prevents cycles
-4. **WebSocket** - Real-time UI updates via Socket.io
-
-### Agent Types
-
-1. **Researcher** - Deep analysis, extracts claims/evidence
-2. **Critic** - Validates claims, identifies weaknesses
-3. **Synthesizer** - Merges analyses, resolves conflicts
-4. **Question Generator** - Generates research questions
-5. **Citation Tracker** - Verifies citations, builds graphs
-6. **Web Research** - Searches academic databases
-
-## Docker Services
-
-### PostgreSQL
-- Image: `postgres:16-alpine`
-- Port: `5432`
-- Database: `research_canvas`
-- User: `canvas_user`
-- Password: `canvas_password` (change in production!)
-
-### Managing Docker
-
-```bash
-# Start database
-docker-compose up -d
-
-# Stop database
-docker-compose down
-
-# View logs
-docker-compose logs -f postgres
-
-# Remove all data (⚠️ destructive)
-docker-compose down -v
+```typescript
+// Complete debate flow
+1. Upload paper → Auto-generate questions
+2. Select questions to debate (1-5)
+3. System generates 3 debate postures
+4. Initial arguments (parallel streaming)
+5. Q&A rounds (3 rounds of cross-examination)
+6. Judge evaluation with detailed scores
+7. Final report with rankings and consensus
+8. Download full transcript in markdown
 ```
 
-## Environment Variables
+### 3. Context Propagation
 
-### Backend (.env)
+When you connect nodes, context flows automatically:
+
+```
+Paper Upload Node (Paper ID: abc123)
+         │
+         ├──> Chat Node (receives: paper.fullText, paper.abstract)
+         │
+         └──> Debate Node (receives: paper data)
+                   │
+                   └──> Chat Node (receives: debate.markdown, debate.questions)
+```
+
+### 4. Real-time Streaming
+
+All AI responses stream in real-time:
+- **Chat messages**: Token-by-token streaming
+- **Debate arguments**: Live argument generation from 3 agents simultaneously
+- **Q&A exchanges**: Live question and response streaming
+- **Progress updates**: Real-time status updates for all operations
+
+## API Endpoints
+
+### Papers
+```
+POST   /api/papers              Upload a paper
+GET    /api/papers/:id          Get paper details
+DELETE /api/papers/:id          Delete a paper
+```
+
+### Canvas
+```
+POST   /api/canvas              Create/update canvas
+GET    /api/canvas/:id          Get canvas state
+DELETE /api/canvas/:id          Delete canvas
+```
+
+### Multi-Agent Debate
+```
+POST   /api/mas-debate/questions        Generate questions from paper
+POST   /api/mas-debate/postures         Generate debate postures
+POST   /api/mas-debate/run-enhanced     Run multi-question debate (SSE)
+```
+
+### Chat
+```
+POST   /api/chat                Chat with AI (supports paper, debate, chat context)
+```
+
+## Database Schema
+
+The system uses PostgreSQL with Prisma ORM. Main models:
+
+| Model | Purpose |
+|-------|---------|
+| **User** | User accounts (future auth) |
+| **Canvas** | Canvas state (nodes, edges as JSON) |
+| **Paper** | Research papers with full text |
+| **Agent** | Agent registry and capabilities |
+| **AgentMessage** | Agent-to-agent communications |
+| **AgentInvocation** | Tool call tracking and results |
+| **DebateSession** | Debate metadata and settings |
+| **Posture** | Debate postures and topics |
+| **DebateTranscript** | Full debate transcripts |
+| **DebateRound** | Individual Q&A rounds |
+| **DebateExchange** | Question-response pairs |
+| **JudgeVerdict** | Judge evaluations and scores |
+
+## Development
+
+### Available Scripts
 
 ```bash
+# Development
+pnpm dev              # Start both frontend and backend
+pnpm build            # Build both applications
+pnpm type-check       # Type check all workspaces
+pnpm lint             # Lint all workspaces
+
 # Database
-DATABASE_URL=postgresql://canvas_user:canvas_password@localhost:5432/research_canvas
+cd backend
+pnpm prisma:generate  # Generate Prisma client
+pnpm prisma:migrate   # Run migrations
+pnpm prisma:studio    # Open Prisma Studio
+pnpm prisma:seed      # Seed database
 
-# AI APIs
-OPENAI_API_KEY=sk-...
-TAVILY_API_KEY=tvly-...
+# Docker
+docker-compose up -d  # Start PostgreSQL
+docker-compose down   # Stop PostgreSQL
+docker-compose logs   # View logs
+```
 
-# Server
+### Development Workflow
+
+1. **Make changes** to frontend or backend code
+2. **Hot reload** is enabled for both servers
+3. **Type check** with `pnpm type-check`
+4. **Database changes**:
+   ```bash
+   cd backend
+   # Edit prisma/schema.prisma
+   pnpm prisma migrate dev --name your_migration_name
+   pnpm prisma generate
+   ```
+
+### Environment Variables
+
+**Frontend (`frontend/.env.local`)**
+```env
+NEXT_PUBLIC_API_URL=http://localhost:4000
+OPENAI_API_KEY=your_key_here
+```
+
+**Backend (`backend/.env`)**
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/research_canvas?schema=public"
+OPENAI_API_KEY=your_key_here
 PORT=4000
 NODE_ENV=development
-
-# Security
-JWT_SECRET=your_jwt_secret_change_in_production
-CORS_ORIGIN=http://localhost:3000
 ```
 
-### Frontend (.env.local)
+## How to Use
 
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_WS_URL=http://localhost:4000
+### Basic Workflow
+
+1. **Upload a Paper**
+   - Drag a "Paper Upload" node onto the canvas
+   - Click to upload a PDF file
+   - Wait for text extraction
+
+2. **Chat About the Paper**
+   - Drag a "Paper Chat" node
+   - Connect Paper Upload → Paper Chat
+   - Start asking questions
+
+3. **Run a Debate**
+   - Drag an "Academic Debate" node
+   - Connect Paper Upload → Debate
+   - Select questions and click "Start Debate"
+   - Watch the live debate unfold
+
+4. **Ask About Debate Results**
+   - Drag another "Paper Chat" node
+   - Connect Debate → Chat
+   - Ask questions about the debate findings
+
+### Advanced Workflows
+
+**Multi-step Analysis**
 ```
+Paper Upload → Researcher Agent → Critic Agent → Synthesizer → Chat
+```
+
+**Debate + Analysis**
+```
+Paper Upload → Debate → Chat (ask about debate)
+            ↓
+            → Researcher Agent → Note (document findings)
+```
+
+**Citation Analysis**
+```
+Paper Upload → Citation Tracker → Citation Graph
+```
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+### Code Standards
+
+- **TypeScript**: Strict mode enabled, no `any` types
+- **Formatting**: Prettier with 2-space indentation
+- **Linting**: ESLint with TypeScript rules
+- **Commits**: Clear, descriptive commit messages
 
 ## Troubleshooting
 
-### Database Connection Issues
+### Common Issues
+
+**Database connection fails**
 ```bash
 # Check if PostgreSQL is running
 docker-compose ps
 
-# View PostgreSQL logs
-docker-compose logs postgres
-
 # Restart PostgreSQL
-docker-compose restart postgres
+docker-compose down
+docker-compose up -d
 ```
 
-### Port Already in Use
+**Frontend can't connect to backend**
 ```bash
-# Frontend (3000)
-# Change port: PORT=3001 pnpm dev
-
-# Backend (4000)
-# Change in backend/.env: PORT=4001
+# Verify NEXT_PUBLIC_API_URL in frontend/.env.local
+# Check backend is running on port 4000
+curl http://localhost:4000/health
 ```
 
-### Prisma Issues
+**Prisma client errors**
 ```bash
-# Regenerate Prisma client
 cd backend
-pnpm prisma:generate
-
-# If migrations fail, reset database
-pnpm prisma migrate reset
+pnpm prisma generate
+pnpm prisma migrate dev
 ```
 
-## Development Workflow
+**pnpm install fails**
+```bash
+# Clear node_modules and lock files
+rm -rf node_modules frontend/node_modules backend/node_modules
+rm pnpm-lock.yaml
 
-1. **Make schema changes** → Update `backend/prisma/schema.prisma`
-2. **Create migration** → `pnpm prisma:migrate`
-3. **Generate client** → `pnpm prisma:generate`
-4. **Update backend types** → TypeScript will auto-detect changes
-5. **Restart dev server** → `pnpm dev`
-
-## Next Steps
-
-See [ACTION_PLAN.md](./ACTION_PLAN.md) for the complete implementation roadmap.
-
-**Phase 1** (Current): Infrastructure Setup ✅
-- [x] Monorepo structure
-- [x] Docker & Database
-- [x] Environment configuration
-- [x] Prisma schema
-
-**Phase 2** (Next): Agent Communication Layer
-- [ ] Agent Registry & Discovery
-- [ ] EventEmitter Orchestration
-- [ ] WebSocket Real-time Updates
+# Reinstall
+pnpm install
+```
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Contributing
+## Acknowledgments
 
-This is a hackathon project. For questions or contributions, please open an issue.
+- Built for the **MEF Labs Hack Nation** hackathon
+- Powered by **OpenAI API** for AI language models
+- UI components from **shadcn/ui**
+- Icons from **Lucide React**
+- Canvas system powered by **@xyflow/react** (React Flow)
+- PDF processing with **pdf.js**
+
+## Support
+
+For questions or issues:
+- Open an issue on GitHub
+- Check existing issues for solutions
+- Review the troubleshooting section above
+
+---
+
+**Built for researchers, by researchers**

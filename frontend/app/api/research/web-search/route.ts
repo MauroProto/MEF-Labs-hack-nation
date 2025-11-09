@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
             if (item?.type === 'web_search_call' && item?.action) {
               const action = item.action as any;
               let activityMessage = '';
-              if (action.type === 'search') activityMessage = `🔍 Buscando: "${action.query}"`;
-              else if (action.type === 'open_page') activityMessage = `📄 Abriendo página: ${action.url}`;
-              else if (action.type === 'find_in_page') activityMessage = `🔎 Buscando en página: "${action.query}"`;
+              if (action.type === 'search') activityMessage = `🔍 Searching: "${action.query}"`;
+              else if (action.type === 'open_page') activityMessage = `📄 Opening page: ${action.url}`;
+              else if (action.type === 'find_in_page') activityMessage = `🔎 Searching in page: "${action.query}"`;
               if (activityMessage) {
                 const data = JSON.stringify({ type: 'activity', message: activityMessage, details: action });
                 controller.enqueue(encoder.encode(`data: ${data}\n\n`));
@@ -120,11 +120,11 @@ export async function POST(request: NextRequest) {
                 let activityMessage = '';
 
                 if (action.type === 'search') {
-                  activityMessage = `🔍 Buscando: "${action.query}"`;
+                  activityMessage = `🔍 Searching: "${action.query}"`;
                 } else if (action.type === 'open_page') {
-                  activityMessage = `📄 Abriendo página: ${action.url}`;
+                  activityMessage = `📄 Opening page: ${action.url}`;
                 } else if (action.type === 'find_in_page') {
-                  activityMessage = `🔎 Buscando en página: "${action.query}"`;
+                  activityMessage = `🔎 Searching in page: "${action.query}"`;
                 }
 
                 if (activityMessage) {
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
                 // Just notify that research is happening
                 const data = JSON.stringify({
                   type: 'activity',
-                  message: '🔬 Investigando...'
+                  message: '🔬 Researching...'
                 });
                 controller.enqueue(encoder.encode(`data: ${data}\n\n`));
               }

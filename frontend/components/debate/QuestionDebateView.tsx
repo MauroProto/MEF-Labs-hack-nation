@@ -43,7 +43,7 @@ export function QuestionDebateView({ result }: QuestionDebateViewProps) {
                   {posture}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
-                  Score: {result.verdict.perDebater[debaterIndex]?.totalScore.toFixed(2) || 'N/A'}
+                  Score: {result.verdict.perDebater[debaterIndex]?.totals.weighted.toFixed(2) || 'N/A'}
                 </div>
               </div>
 
@@ -137,19 +137,19 @@ export function QuestionDebateView({ result }: QuestionDebateViewProps) {
                     <div className="text-xs font-semibold text-gray-700 mb-2">Judge Evaluation</div>
                     <div className="text-xs space-y-1">
                       <div>
-                        <span className="font-medium">Coherence:</span>{' '}
-                        {result.verdict.perDebater[debaterIndex].coherence.toFixed(1)}
+                        <span className="font-medium">Correctness:</span>{' '}
+                        {result.verdict.perDebater[debaterIndex].totals.byCriterion.correctness?.toFixed(1) || 'N/A'}
                       </div>
                       <div>
                         <span className="font-medium">Evidence:</span>{' '}
-                        {result.verdict.perDebater[debaterIndex].evidence.toFixed(1)}
+                        {result.verdict.perDebater[debaterIndex].totals.byCriterion.evidence?.toFixed(1) || 'N/A'}
                       </div>
                       <div>
-                        <span className="font-medium">Persuasiveness:</span>{' '}
-                        {result.verdict.perDebater[debaterIndex].persuasiveness.toFixed(1)}
+                        <span className="font-medium">Clarity:</span>{' '}
+                        {result.verdict.perDebater[debaterIndex].totals.byCriterion.clarity?.toFixed(1) || 'N/A'}
                       </div>
                       <div className="font-bold mt-2">
-                        Total: {result.verdict.perDebater[debaterIndex].totalScore.toFixed(2)}
+                        Total: {result.verdict.perDebater[debaterIndex].totals.weighted.toFixed(2)}
                       </div>
                     </div>
                   </div>

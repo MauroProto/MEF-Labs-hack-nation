@@ -15,6 +15,15 @@ export async function POST(request: NextRequest) {
   try {
     const { messages, paperContext, debateContext, chatContext } = await request.json();
 
+    // Debug logging
+    console.log('[Chat API] Request received');
+    console.log('[Chat API] Has paperContext:', !!paperContext);
+    console.log('[Chat API] Has debateContext:', !!debateContext);
+    if (debateContext) {
+      console.log('[Chat API] Debate questions:', debateContext.questions?.length);
+      console.log('[Chat API] Markdown length:', debateContext.markdown?.length);
+    }
+
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { error: 'Messages array is required' },

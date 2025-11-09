@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
 import { BaseNode } from './BaseNode';
 import { Search, Square, Loader2, Link2 } from 'lucide-react';
 import { usePaperContextStore } from '@/lib/stores/paperContextStore';
@@ -23,7 +23,7 @@ interface WebResearchNodeProps {
 
 type ResearchStatus = 'idle' | 'working' | 'completed' | 'error';
 
-export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
+function WebResearchNodeComponent({ id, data, selected }: WebResearchNodeProps) {
   const [status, setStatus] = useState<ResearchStatus>((data.status as ResearchStatus) || 'idle');
   const [query, setQuery] = useState<string>(data.query || '');
   const [output, setOutput] = useState<string>(data.output || '');
@@ -31,8 +31,10 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
   const [activities, setActivities] = useState<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const { getPaper } = usePaperContextStore();
-  const { updateConversation, getUpstreamChats } = useChatContextStore();
+  // Optimized Zustand selectors - separate calls to avoid infinite loop
+  const getPaper = usePaperContextStore((s) => s.getPaper);
+  const updateConversation = useChatContextStore((s) => s.updateConversation);
+  const getUpstreamChats = useChatContextStore((s) => s.getUpstreamChats);
   const edges = useStore((s) => s.edges);
   const nodes = useStore((s) => s.nodes);
 
@@ -53,9 +55,11 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
   // Get upstream chats for context
   const upstreamChats = getUpstreamChats(id);
 
-  // Update conversation store when we have output (so other nodes can use this research as context)
+  // Debounced update to conversation store - reduces unnecessary updates
   useEffect(() => {
-    if (output && query) {
+    if (!output || !query) return;
+
+    const timeoutId = setTimeout(() => {
       const messages = [
         {
           id: `research-query-${Date.now()}`,
@@ -75,7 +79,9 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
         messages,
         connectedPaper ? { paperId: connectedPaper.id, title: connectedPaper.title } : undefined
       );
-    }
+    }, 500); // Debounce by 500ms
+
+    return () => clearTimeout(timeoutId);
   }, [output, query, id, connectedPaper, updateConversation]);
 
   const handleResearch = useCallback(async () => {
@@ -116,8 +122,8 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
 
       setProgressMessage(
         connectedPaper
-          ? `🌐 Investigando en torno a: ${connectedPaper.title}`
-          : '🌐 Iniciando búsqueda web...'
+          ? `🌐 Researching around: ${connectedPaper.title}`
+          : '🌐 Starting web search...'
       );
 
       const reader = response.body?.getReader();
@@ -217,7 +223,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
                 <span className="font-medium text-gray-900">Paper:</span> {connectedPaper.title}
               </div>
             ) : (
-              <div className="text-[11px] text-gray-500">Búsqueda web general</div>
+              <div className="text-[11px] text-gray-500">General web search</div>
             )}
             {upstreamChats.length > 0 && (
               <div className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
@@ -227,7 +233,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
             )}
           </div>
           <div className="flex items-center gap-2 text-[10px] text-gray-400">
-            {status === 'working' && <span>{progressMessage || 'Investigando…'}</span>}
+            {status === 'working' && <span>{progressMessage || 'Researching…'}</span>}
           </div>
         </div>
 
@@ -258,15 +264,15 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
               {status === 'working' ? (
                 <>
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-green-500" />
-                  <p className="mt-2 text-gray-500">{progressMessage || 'Investigando…'}</p>
+                  <p className="mt-2 text-gray-500">{progressMessage || 'Researching…'}</p>
                 </>
               ) : (
                 <p className="text-gray-500">
                   {connectedPaper
-                    ? 'Ingresa una consulta para investigar en torno al paper'
+                    ? 'Enter a query to research around the paper'
                     : upstreamChats.length > 0
-                    ? 'Investiga basándote en conversaciones previas'
-                    : 'Realiza una búsqueda web profunda'}
+                    ? 'Research based on previous conversations'
+                    : 'Perform a deep web search'}
                 </p>
               )}
             </div>
@@ -284,7 +290,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
                   setQuery(e.target.value);
                   data.query = e.target.value;
                 }}
-                placeholder={connectedPaper || upstreamChats.length > 0 ? 'Escribe tu búsqueda…' : 'Escribe tu búsqueda web…'}
+                placeholder={connectedPaper || upstreamChats.length > 0 ? 'Type your search…' : 'Type your web search…'}
                 disabled={status === 'working'}
                 className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400"
               />
@@ -293,7 +299,7 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
                   onClick={handleResearch}
                   disabled={!query.trim()}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:bg-gray-300"
-                  title="Investigar"
+                  title="Research"
                 >
                   <Search className="h-3.5 w-3.5" />
                 </button>
@@ -313,3 +319,6 @@ export function WebResearchNode({ id, data, selected }: WebResearchNodeProps) {
     </BaseNode>
   );
 }
+
+// Export memoized version to prevent unnecessary re-renders
+export const WebResearchNode = memo(WebResearchNodeComponent);
