@@ -4,6 +4,7 @@ import {
   generatePosturesAndTopics,
   runDebate,
   runCompleteDebateFlow,
+  runEnhancedDebate,
 } from "../controllers/masDebateController";
 
 const router: IRouter = Router();
@@ -37,6 +38,14 @@ router.post("/run", runDebate);
  * Supports SSE for progress updates (set Accept: text/event-stream)
  */
 router.post("/run-complete", runCompleteDebateFlow);
+
+/**
+ * POST /api/mas-debate/run-enhanced
+ * Run enhanced debate with multiple questions and debate rounds
+ * Body: { paperId: string, questions: string[], numPostures?: number, numRounds?: number }
+ * Supports SSE for progress updates (set Accept: text/event-stream)
+ */
+router.post("/run-enhanced", runEnhancedDebate);
 
 export default router;
 

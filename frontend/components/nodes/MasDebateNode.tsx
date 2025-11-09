@@ -22,10 +22,11 @@ interface MasDebateNodeProps {
 
 export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
   const [customQuestion, setCustomQuestion] = useState('');
-  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number | null>(null);
+  const [selectedQuestionIndices, setSelectedQuestionIndices] = useState<Set<number>>(new Set());
+  const [showTranscript, setShowTranscript] = useState(false);
 
   const { getPaperForNode } = usePaperContextStore();
-  const { debateState, loading, fetchQuestions, runDebate, loadDebateFromHistory, reset } = useMasDebate();
+  const { debateState, loading, fetchQuestions, runDebate, runEnhancedDebate, loadDebateFromHistory, reset } = useMasDebate();
 
   const connectedPaper = getPaperForNode(id);
 

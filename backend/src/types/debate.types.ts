@@ -68,7 +68,30 @@ export type JudgeVerdict = {
   controversialPoints: string[];
 };
 
-// Reporter Output
+// Enhanced Debate Types (Multi-Question + Rounds)
+export type DebateExchange = {
+  fromDebater: string;      // posture asking
+  toDebater: string;        // posture responding
+  question: string;         // question asked
+  response: string;         // response given
+  timestamp: number;        // when this happened
+};
+
+export type DebateRound = {
+  roundNumber: number;
+  exchanges: DebateExchange[];
+};
+
+export type QuestionDebateResult = {
+  question: string;
+  postures: string[];
+  topics: string[];
+  initialArguments: DebaterArgument[];
+  rounds: DebateRound[];
+  verdict: JudgeVerdict;
+};
+
+// Reporter Output (Original - Single Question)
 export type DebateReport = {
   question: string;
   topics: string[];
@@ -91,6 +114,20 @@ export type DebateReport = {
     }>;
     scoringTable: JudgeVerdict["perDebater"];
   };
+  markdown: string;
+};
+
+// Enhanced Report (Multiple Questions + Rounds)
+export type EnhancedDebateReport = {
+  questions: string[];
+  debateResults: QuestionDebateResult[];
+  overallSummary: string;
+  consolidatedInsights: string[];
+  consolidatedControversialPoints: string[];
+  finalRanking: Array<{
+    posture: string;
+    averageScore: number;
+  }>;
   markdown: string;
 };
 
