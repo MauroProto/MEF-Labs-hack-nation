@@ -188,20 +188,26 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
 
                         {/* Show argument preview when complete */}
                         {debater.status === 'complete' && debater.argument && (
-                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
-                            <p className="font-semibold text-green-900 mb-1">Opening Statement:</p>
-                            <p className="text-gray-700 line-clamp-3 mb-2">
-                              {debater.argument.openingStatement}
-                            </p>
-                            {debater.argument.topicArguments && debater.argument.topicArguments.length > 0 && (
-                              <>
-                                <p className="font-semibold text-green-900 mb-1">
-                                  Topic 1 - {debater.argument.topicArguments[0].topic}:
-                                </p>
-                                <p className="text-gray-700 line-clamp-2">
-                                  {debater.argument.topicArguments[0].argument}
-                                </p>
-                              </>
+                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs max-w-full">
+                            {debater.argument.perTopic && debater.argument.perTopic.length > 0 && (
+                              <div className="space-y-2">
+                                <div>
+                                  <p className="font-semibold text-green-900 mb-1">
+                                    {debater.argument.perTopic[0].topic}:
+                                  </p>
+                                  <p className="text-gray-700 line-clamp-2 mb-1">
+                                    <span className="font-medium">Claim:</span> {debater.argument.perTopic[0].claim}
+                                  </p>
+                                  <p className="text-gray-600 text-xs line-clamp-2">
+                                    {debater.argument.perTopic[0].reasoning}
+                                  </p>
+                                </div>
+                                {debater.argument.perTopic.length > 1 && (
+                                  <p className="text-xs text-gray-500 italic">
+                                    +{debater.argument.perTopic.length - 1} more topic(s)
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
