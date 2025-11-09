@@ -26,6 +26,25 @@ export type DebateStatus =
   | 'completed'
   | 'error';
 
+export type DebaterProgress = {
+  index: number;
+  posture: string;
+  status: 'idle' | 'running' | 'complete' | 'error';
+  argument?: DebaterArgument;
+  error?: string;
+};
+
+export type DebateHistoryEntry = {
+  id: string;
+  question: string;
+  timestamp: Date;
+  postures: string[];
+  topics: string[];
+  arguments: DebaterArgument[];
+  verdict: JudgeVerdict;
+  report: DebateReport;
+};
+
 export type DebateState = {
   status: DebateStatus;
   progress: string;
@@ -38,10 +57,16 @@ export type DebateState = {
   postures?: string[];
   topics?: string[];
 
-  // Debate results
+  // Per-debater progress tracking
+  debaterProgress: DebaterProgress[];
+
+  // Debate results (current debate)
   arguments?: DebaterArgument[];
   verdict?: JudgeVerdict;
   report?: DebateReport;
+
+  // Debate history (completed debates)
+  history: DebateHistoryEntry[];
 
   // Error
   error?: string;
@@ -51,6 +76,8 @@ export function useMasDebate() {
   const [debateState, setDebateState] = useState<DebateState>({
     status: 'idle',
     progress: '',
+    debaterProgress: [],
+    history: [],
   });
 
   const [loading, setLoading] = useState(false);
@@ -145,13 +172,79 @@ export function useMasDebate() {
 
             // Update state based on progress stage
             if (event.stage === 'postures_generated') {
+              // Initialize debater progress array when postures are generated
+              const initialProgress: DebaterProgress[] = event.data.postures.map(
+                (posture: string, index: number) => ({
+                  index,
+                  posture,
+                  status: 'idle' as const,
+                })
+              );
+
               setDebateState((prev) => ({
                 ...prev,
                 status: 'debating',
                 progress: `Postures generated: ${event.data.postures.join(', ')}`,
                 postures: event.data.postures,
                 topics: event.data.topics,
+                debaterProgress: initialProgress,
               }));
+            } else if (event.stage === 'debater_started') {
+              // Update specific debater to 'running' status
+              setDebateState((prev) => {
+                const newProgress = [...prev.debaterProgress];
+                const debaterIndex = event.data.debaterIndex;
+                newProgress[debaterIndex] = {
+                  ...newProgress[debaterIndex],
+                  status: 'running',
+                };
+
+                const completed = newProgress.filter((d) => d.status === 'complete').length;
+                const total = event.data.total;
+
+                return {
+                  ...prev,
+                  debaterProgress: newProgress,
+                  progress: `Debating... (${completed}/${total} complete)`,
+                };
+              });
+            } else if (event.stage === 'debater_complete') {
+              // Update specific debater to 'complete' status
+              setDebateState((prev) => {
+                const newProgress = [...prev.debaterProgress];
+                const debaterIndex = event.data.debaterIndex;
+                newProgress[debaterIndex] = {
+                  ...newProgress[debaterIndex],
+                  status: 'complete',
+                  argument: event.data.argument,
+                };
+
+                const completed = newProgress.filter((d) => d.status === 'complete').length;
+                const total = event.data.total;
+
+                return {
+                  ...prev,
+                  debaterProgress: newProgress,
+                  progress: `Debating... (${completed}/${total} complete)`,
+                };
+              });
+            } else if (event.stage === 'debater_error') {
+              // Update specific debater to 'error' status
+              setDebateState((prev) => {
+                const newProgress = [...prev.debaterProgress];
+                const debaterIndex = event.data.debaterIndex;
+                newProgress[debaterIndex] = {
+                  ...newProgress[debaterIndex],
+                  status: 'error',
+                  error: event.data.error,
+                };
+
+                return {
+                  ...prev,
+                  debaterProgress: newProgress,
+                  progress: `Debater ${debaterIndex + 1} encountered an error`,
+                };
+              });
             } else if (event.stage === 'debate_complete') {
               setDebateState((prev) => ({
                 ...prev,
@@ -167,12 +260,29 @@ export function useMasDebate() {
                 verdict: event.data.verdict,
               }));
             } else if (event.stage === 'report_complete') {
-              setDebateState((prev) => ({
-                ...prev,
-                status: 'completed',
-                progress: 'Debate report ready!',
-                report: event.data.report,
-              }));
+              setDebateState((prev) => {
+                // Only save to history if we have all required data
+                const newHistory = prev.verdict && prev.arguments && prev.postures && prev.topics
+                  ? [{
+                      id: Date.now().toString(),
+                      question: prev.selectedQuestion || question,
+                      timestamp: new Date(),
+                      postures: prev.postures,
+                      topics: prev.topics,
+                      arguments: prev.arguments,
+                      verdict: prev.verdict,
+                      report: event.data.report,
+                    }, ...prev.history]
+                  : prev.history;
+
+                return {
+                  ...prev,
+                  status: 'completed',
+                  progress: 'Debate report ready!',
+                  report: event.data.report,
+                  history: newHistory,
+                };
+              });
               setLoading(false);
               resolve(event.data.report);
             } else {
@@ -211,13 +321,38 @@ export function useMasDebate() {
   );
 
   // ====================================================================
-  // Reset State
+  // Load debate from history
+  // ====================================================================
+  const loadDebateFromHistory = useCallback((historyId: string) => {
+    setDebateState((prev) => {
+      const entry = prev.history.find((h) => h.id === historyId);
+      if (!entry) return prev;
+
+      return {
+        ...prev,
+        status: 'completed',
+        progress: 'Loaded from history',
+        selectedQuestion: entry.question,
+        postures: entry.postures,
+        topics: entry.topics,
+        arguments: entry.arguments,
+        verdict: entry.verdict,
+        report: entry.report,
+        debaterProgress: [],
+      };
+    });
+  }, []);
+
+  // ====================================================================
+  // Reset State (but preserve history)
   // ====================================================================
   const reset = useCallback(() => {
-    setDebateState({
+    setDebateState((prev) => ({
       status: 'idle',
       progress: '',
-    });
+      debaterProgress: [],
+      history: prev.history, // Preserve history
+    }));
     setLoading(false);
   }, []);
 
@@ -227,6 +362,7 @@ export function useMasDebate() {
     fetchQuestions,
     fetchPostures,
     runDebate,
+    loadDebateFromHistory,
     reset,
   };
 }

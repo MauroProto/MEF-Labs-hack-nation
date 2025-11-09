@@ -16,7 +16,7 @@ export abstract class BaseDebateAgent {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    this.model = config.model || "gpt-4o";
+    this.model = config.model || "gpt-4o-mini";
     this.maxTokens = config.maxTokens || 4096;
     this.temperature = config.temperature || 0.7;
   }

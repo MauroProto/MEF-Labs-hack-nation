@@ -61,22 +61,53 @@ export class DebateCoordinator {
 
   /**
    * Step 3: Run the debate with N debaters (parallel)
+   * Emits per-debater progress events when onProgress callback is provided
    */
   async runDebate(
     paper: Paper,
     question: string,
     topics: string[],
-    postures: string[]
+    postures: string[],
+    onProgress?: (stage: string, data?: any) => void
   ): Promise<DebaterArgument[]> {
-    // Create debater agents and run them in parallel
-    const debatePromises = postures.map((posture) => {
+    // Create debater agents and run them in parallel with progress tracking
+    const debatePromises = postures.map(async (posture, index) => {
       const debater = new DebaterAgent();
-      return debater.debate({
+
+      // Emit debater started event
+      onProgress?.("debater_started", {
+        debaterIndex: index,
         posture,
-        question,
-        topics,
-        paper,
+        total: postures.length
       });
+
+      try {
+        const argument = await debater.debate({
+          posture,
+          question,
+          topics,
+          paper,
+        });
+
+        // Emit debater completed event with the argument
+        onProgress?.("debater_complete", {
+          debaterIndex: index,
+          posture,
+          argument,
+          total: postures.length
+        });
+
+        return argument;
+      } catch (error) {
+        // Emit debater error event
+        onProgress?.("debater_error", {
+          debaterIndex: index,
+          posture,
+          error: error instanceof Error ? error.message : String(error),
+          total: postures.length
+        });
+        throw error;
+      }
     });
 
     const debaterArguments = await Promise.all(debatePromises);
@@ -141,7 +172,7 @@ export class DebateCoordinator {
 
       // Step 2: Run debate
       onProgress?.("Running debate with " + numPostures + " debaters...");
-      const debaterArguments = await this.runDebate(paper, question, topics, postures);
+      const debaterArguments = await this.runDebate(paper, question, topics, postures, onProgress);
       onProgress?.("debate_complete", { arguments: debaterArguments });
 
       // Step 3: Judge debate

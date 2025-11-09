@@ -136,6 +136,9 @@ export type DebateProgressEvent =
   | { stage: 'Generating postures and topics...'; data?: any }
   | { stage: 'postures_generated'; data: { postures: string[]; topics: string[] } }
   | { stage: 'Running debate with N debaters...'; data?: any }
+  | { stage: 'debater_started'; data: { debaterIndex: number; posture: string; total: number } }
+  | { stage: 'debater_complete'; data: { debaterIndex: number; posture: string; argument: DebaterArgument; total: number } }
+  | { stage: 'debater_error'; data: { debaterIndex: number; posture: string; error: string; total: number } }
   | { stage: 'debate_complete'; data: { arguments: DebaterArgument[] } }
   | { stage: 'Judging arguments...'; data?: any }
   | { stage: 'judging_complete'; data: { verdict: JudgeVerdict } }

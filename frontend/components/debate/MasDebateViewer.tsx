@@ -46,12 +46,15 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
 
       {/* Topics Tabs */}
       <Tabs value={selectedTopic.toString()} onValueChange={(v) => setSelectedTopic(parseInt(v))}>
-        <TabsList className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+        <TabsList className="w-full flex flex-wrap gap-2">
           {report.topics.map((topic, index) => (
-            <TabsTrigger key={index} value={index.toString()} className="text-sm">
+            <TabsTrigger key={index} value={index.toString()} className="text-sm flex-1 min-w-[150px]">
               {topic}
             </TabsTrigger>
           ))}
+          <TabsTrigger value="verdict" className="text-sm flex-1 min-w-[150px] bg-amber-50">
+            Final Verdict
+          </TabsTrigger>
         </TabsList>
 
         {/* Topic Content */}
@@ -182,10 +185,6 @@ export function MasDebateViewer({ report, arguments: debaterArgs }: MasDebateVie
         ))}
 
         {/* Final Verdict Tab */}
-        <TabsList className="mt-4">
-          <TabsTrigger value="verdict">Final Verdict</TabsTrigger>
-        </TabsList>
-
         <TabsContent value="verdict" className="space-y-4">
           {/* Summary */}
           <Card className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
