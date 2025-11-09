@@ -93,7 +93,9 @@ export function EnhancedCanvas() {
           label: String(config.label), // Ensure it's a string
           type: nodeType as any,
           config,
+          locked: false,
         },
+        draggable: true,
         style: {
           width: config.defaultWidth,
           height: config.defaultHeight,
@@ -135,7 +137,9 @@ export function EnhancedCanvas() {
         label: String(config.label), // Ensure it's a string
         type: nodeType as any,
         config,
+        locked: false,
       },
+      draggable: true,
       style: {
         width: config.defaultWidth,
         height: config.defaultHeight,
