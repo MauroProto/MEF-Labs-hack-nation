@@ -69,7 +69,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         }
       }
 
-      // First, ensure we have a canvas (create or get default)
+      // Get or create default canvas
       let canvasId = 'default';
       try {
         const canvasResponse = await fetch('http://localhost:4000/api/canvas', {
@@ -85,7 +85,7 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         console.warn('Failed to create/get canvas, using default', err);
       }
 
-      // Upload paper to backend
+      // Save paper to database
       const backendPaperData = {
         canvasId,
         title: file.name.replace(/\.[^/.]+$/, ''),
@@ -109,14 +109,32 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
         });
 
         if (!paperResponse.ok) {
-          throw new Error('Failed to save paper to backend');
+          const errorData = await paperResponse.json().catch(() => null);
+          throw new Error(errorData?.error || `HTTP ${paperResponse.status}`);
         }
 
         const result = await paperResponse.json();
         savedPaper = result.data;
       } catch (err) {
         console.error('Failed to save paper to backend:', err);
-        alert('Failed to save paper to database. Please try again.');
+        // Fallback to in-memory only if database fails
+        const paperData = {
+          id: `paper-${Date.now()}`,
+          canvasId: 'default',
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          authors: [{ name: 'Unknown Author' }],
+          abstract: null,
+          fullText: extractedText || 'Uploaded PDF (preview available).',
+          citations: [],
+          metadata: {
+            uploadedAt: new Date(),
+            fileUrl: objectUrl,
+            filename: file.name,
+          },
+        };
+        addPaper(paperData);
+        connectNodeToPaper(id, paperData.id);
+        data.lastPaperId = paperData.id;
         return;
       }
 
