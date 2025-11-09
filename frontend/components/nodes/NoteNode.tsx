@@ -62,17 +62,17 @@ export function NoteNode({ id, data, selected }: NoteNodeProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             {saving ? (
-              <Save className="h-2.5 w-2.5 text-blue-500 animate-pulse" />
+              <Save className="h-3 w-3 text-blue-500 animate-pulse" />
             ) : saved ? (
-              <Check className="h-2.5 w-2.5 text-green-500" />
+              <Check className="h-3 w-3 text-green-500" />
             ) : (
-              <div className="h-2.5 w-2.5 rounded-full bg-gray-400" />
+              <div className="h-3 w-3 rounded-full bg-gray-400" />
             )}
-            <span className="text-[10px] text-gray-400 uppercase tracking-wide">
+            <span className="text-xs text-gray-400 uppercase tracking-wide">
               {saving ? 'saving' : saved ? 'saved' : 'edit'}
             </span>
           </div>
-          <span className="text-[10px] text-gray-400">{content.length}</span>
+          <span className="text-xs text-gray-400">{content.length}</span>
         </div>
 
         {/* Text Area */}
@@ -80,7 +80,7 @@ export function NoteNode({ id, data, selected }: NoteNodeProps) {
           value={content}
           onChange={handleChange}
           placeholder="Note..."
-          className="w-full h-32 px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none font-mono"
+          className="w-full h-32 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none font-mono"
           style={{ minHeight: '128px' }}
         />
       </div>
