@@ -7,7 +7,11 @@
 import { nanoid } from 'nanoid';
 import { prisma } from '../lib/prisma';
 import { agentBus } from './agentEventBus';
-import { orchestrator } from './agentOrchestrator';
+import {
+  generateExposition,
+  generateQuestion,
+  generateAnswer,
+} from './debaterAgent';
 import {
   Posture,
   DebateExchange,
@@ -15,8 +19,6 @@ import {
   DebateTranscript,
   AgentError,
   ErrorCode,
-  AgentInvocationParams,
-  AgentInvocationResult,
 } from '../types/agent.types';
 
 export class DebateOrchestrator {
@@ -177,22 +179,20 @@ export class DebateOrchestrator {
     const exchanges: DebateExchange[] = [];
 
     for (const posture of this.postures) {
-      const prompt = `You are presenting the following debate posture:
-
-**Perspective**: ${posture.perspectiveTemplate}
-**Position**: ${posture.initialPosition}
-**Topics to Cover**: ${posture.topics.join(', ')}
-**Guiding Questions**: ${posture.guidingQuestions.join('; ')}
-
-Present your posture in a clear, structured way. Address your assigned topics and explore your guiding questions. Be comprehensive but concise (500-800 words).`;
+      console.log(`[DebateOrchestrator] Generating exposition for ${posture.debaterId}...`);
 
       try {
-        const result = await this.invokeWithRetry({
-          from: 'debate-orchestrator',
-          to: posture.debaterId,
-          tool: 'present_exposition',
-          args: { prompt, posture },
-          timeout: 45000,
+        // Get research analysis from session
+        const session = await prisma.debateSession.findUnique({
+          where: { id: this.sessionId },
+          select: { researchAnalysis: true },
+        });
+
+        // Generate exposition using debaterAgent
+        const content = await generateExposition({
+          posture,
+          researchAnalysis: session?.researchAnalysis || '',
+          debateHistory: [],
         });
 
         const exchange: DebateExchange = {
@@ -200,12 +200,13 @@ Present your posture in a clear, structured way. Address your assigned topics an
           from: posture.debaterId,
           to: undefined,
           type: 'exposition',
-          content: result.data.presentation || result.data,
+          content,
           topics: posture.topics,
           timestamp: new Date(),
         };
 
         exchanges.push(exchange);
+        console.log(`[DebateOrchestrator] ✓ Exposition generated for ${posture.debaterId}`);
 
         // Emit real-time event
         agentBus.emit('agent:broadcast', {
@@ -230,102 +231,102 @@ Present your posture in a clear, structured way. Address your assigned topics an
   ): Promise<DebateExchange[]> {
     const exchanges: DebateExchange[] = [];
     const targetPosture = this.postures[targetIndex];
-    const otherDebaters = this.debaters.filter(
-      (d) => d !== targetPosture.debaterId
-    );
+    const otherPostures = this.postures.filter((p) => p.id !== targetPosture.id);
 
-    // Each other debater asks up to 2 questions
-    const allQuestions: Array<{
-      from: string;
-      questions: string[];
-    }> = [];
+    // Get research analysis and debate history
+    const session = await prisma.debateSession.findUnique({
+      where: { id: this.sessionId },
+      select: { researchAnalysis: true },
+    });
 
-    for (const questioner of otherDebaters) {
-      const questionPrompt = `Based on the following posture presentation, generate 2 probing questions:
+    const debateHistory = this.exchanges.map((ex) => ({
+      from: ex.from,
+      to: ex.to,
+      content: ex.content,
+    }));
 
-**Posture**: ${targetPosture.perspectiveTemplate}
-**Position**: ${targetPosture.initialPosition}
-**Topics**: ${targetPosture.topics.join(', ')}
+    console.log(`[DebateOrchestrator] Cross-examining ${targetPosture.debaterId}...`);
 
-Generate exactly 2 questions that:
-1. Challenge assumptions or probe deeper
-2. Address specific topics or claims
-3. Are respectful but intellectually rigorous
-
-Return as JSON: { "questions": ["Q1", "Q2"] }`;
-
+    // Each other debater asks 1 question
+    for (const questionerPosture of otherPostures) {
       try {
-        const result = await this.invokeWithRetry({
-          from: 'debate-orchestrator',
-          to: questioner,
-          tool: 'generate_questions',
-          args: { prompt: questionPrompt },
-          timeout: 30000,
-        });
+        console.log(`[DebateOrchestrator]   ${questionerPosture.debaterId} asking question...`);
 
-        const questions =
-          result.data.questions || [result.data.question1, result.data.question2].filter(Boolean);
+        const question = await generateQuestion(
+          {
+            posture: questionerPosture,
+            researchAnalysis: session?.researchAnalysis || '',
+            debateHistory,
+          },
+          targetPosture
+        );
 
-        allQuestions.push({ from: questioner, questions });
-
-        // Add question exchanges
-        for (const question of questions.slice(0, 2)) {
-          const exchange: DebateExchange = {
-            id: nanoid(),
-            from: questioner,
-            to: targetPosture.debaterId,
-            type: 'question',
-            content: question,
-            topics: targetPosture.topics,
-            timestamp: new Date(),
-          };
-          exchanges.push(exchange);
-        }
-      } catch (error) {
-        console.error(`Question generation failed for ${questioner}:`, error);
-        // Continue with other questioners
-      }
-    }
-
-    // Target debater answers all questions
-    const allQuestionsText = allQuestions
-      .flatMap(({ from, questions }) =>
-        questions.map((q, i) => `**From ${from} (Q${i + 1})**: ${q}`)
-      )
-      .join('\n\n');
-
-    if (allQuestionsText) {
-      const answerPrompt = `Answer the following questions about your posture:
-
-${allQuestionsText}
-
-Provide clear, substantive answers that address each question. Be direct and evidence-based.`;
-
-      try {
-        const result = await this.invokeWithRetry({
-          from: 'debate-orchestrator',
-          to: targetPosture.debaterId,
-          tool: 'answer_questions',
-          args: { prompt: answerPrompt, questions: allQuestionsText },
-          timeout: 60000,
-        });
-
-        const exchange: DebateExchange = {
+        const questionExchange: DebateExchange = {
           id: nanoid(),
-          from: targetPosture.debaterId,
-          to: undefined,
-          type: 'answer',
-          content: result.data.answers || result.data,
+          from: questionerPosture.debaterId,
+          to: targetPosture.debaterId,
+          type: 'question',
+          content: question,
           topics: targetPosture.topics,
           timestamp: new Date(),
         };
 
-        exchanges.push(exchange);
+        exchanges.push(questionExchange);
+        console.log(`[DebateOrchestrator]   ✓ Question generated`);
+
+        // Emit real-time event
+        agentBus.emit('agent:broadcast', {
+          type: 'debate:exchange',
+          payload: questionExchange,
+          timestamp: new Date(),
+        });
       } catch (error) {
-        console.error(
-          `Answer generation failed for ${targetPosture.debaterId}:`,
-          error
+        console.error(`Question generation failed for ${questionerPosture.debaterId}:`, error);
+        // Continue with other questioners
+      }
+    }
+
+    // Target debater answers each question
+    const questions = exchanges.filter((ex) => ex.type === 'question');
+    for (const questionExchange of questions) {
+      try {
+        console.log(`[DebateOrchestrator]   ${targetPosture.debaterId} answering question...`);
+
+        const answer = await generateAnswer(
+          {
+            posture: targetPosture,
+            researchAnalysis: session?.researchAnalysis || '',
+            debateHistory: [...debateHistory, ...exchanges.map((ex) => ({
+              from: ex.from,
+              to: ex.to,
+              content: ex.content,
+            }))],
+          },
+          questionExchange.content,
+          questionExchange.from
         );
+
+        const answerExchange: DebateExchange = {
+          id: nanoid(),
+          from: targetPosture.debaterId,
+          to: questionExchange.from,
+          type: 'answer',
+          content: answer,
+          topics: targetPosture.topics,
+          timestamp: new Date(),
+        };
+
+        exchanges.push(answerExchange);
+        console.log(`[DebateOrchestrator]   ✓ Answer generated`);
+
+        // Emit real-time event
+        agentBus.emit('agent:broadcast', {
+          type: 'debate:exchange',
+          payload: answerExchange,
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error(`Answer generation failed for ${targetPosture.debaterId}:`, error);
         throw error;
       }
     }
@@ -333,38 +334,6 @@ Provide clear, substantive answers that address each question. Be direct and evi
     return exchanges;
   }
 
-  /**
-   * Retry logic for transient failures
-   */
-  private async invokeWithRetry(
-    params: AgentInvocationParams,
-    maxRetries: number = 2
-  ): Promise<AgentInvocationResult> {
-    let lastError: Error | AgentError;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await orchestrator.invoke(params);
-      } catch (error: any) {
-        lastError = error;
-
-        // Only retry on rate limits or timeouts
-        if (error.code === ErrorCode.RateLimitExceeded) {
-          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          continue;
-        }
-
-        if (error.code === ErrorCode.Timeout && attempt < maxRetries) {
-          continue; // Retry timeouts
-        }
-
-        throw error; // Don't retry other errors
-      }
-    }
-
-    throw lastError!;
-  }
 
   /**
    * Handle debate failure - save partial transcript

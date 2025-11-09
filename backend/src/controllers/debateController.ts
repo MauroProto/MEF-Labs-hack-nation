@@ -199,6 +199,8 @@ export async function listDebateSessions(req: Request, res: Response) {
  */
 async function conductDebateAsync(sessionId: string, postures: any[]) {
   try {
+    console.log(`[Debate] Starting debate orchestration for session ${sessionId}...`);
+
     // 1. Run debate
     const orchestrator = new DebateOrchestrator(sessionId, postures);
     const transcript = await orchestrator.conductDebate();
