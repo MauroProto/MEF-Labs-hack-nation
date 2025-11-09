@@ -9,10 +9,10 @@ import { prisma } from '../lib/prisma';
 
 // Validation schemas
 const CreatePaperSchema = z.object({
-  canvasId: z.string().min(1), // Relaxed for hackathon - accept any non-empty string
+  canvasId: z.string().min(1),
   title: z.string().min(1),
   authors: z.array(z.string()),
-  abstract: z.string().optional(),
+  abstract: z.string().nullish(), // Accept string, null, or undefined
   fullText: z.string().min(1),
   citations: z.any().optional(),
   metadata: z.any().optional(), // DOI, year, source, fileUrl, etc.
@@ -129,6 +129,7 @@ export async function createPaper(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('[PaperController] Validation error:', JSON.stringify(error.errors, null, 2));
       return res.status(400).json({
         success: false,
         error: 'Validation failed',

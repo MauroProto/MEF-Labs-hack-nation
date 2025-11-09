@@ -63,7 +63,11 @@ export function PaperUploadNode({ id, data, selected }: PaperUploadNodeProps) {
               .join(' ');
             extractedText += text + '\n';
           }
-          extractedText = extractedText.trim();
+          // Sanitize text: remove null bytes and invalid UTF-8 characters for PostgreSQL
+          extractedText = extractedText
+            .replace(/\0/g, '') // Remove null bytes
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+            .trim();
         } catch (err) {
           console.warn('PDF text extraction failed, using placeholder.', err);
         }
