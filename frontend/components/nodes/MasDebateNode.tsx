@@ -147,7 +147,7 @@ export function MasDebateNode({ id, data, selected }: MasDebateNodeProps) {
             )}
 
             {/* Show per-debater progress */}
-            {debateState.debaterProgress.length > 0 && (
+            {debateState.debaterProgress && debateState.debaterProgress.length > 0 && (
               <div className="w-full max-w-md bg-white border-2 border-gray-200 rounded-lg p-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Debater Progress:</p>
                 <div className="space-y-3">

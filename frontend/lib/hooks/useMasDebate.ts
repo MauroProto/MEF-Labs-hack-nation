@@ -261,24 +261,26 @@ export function useMasDebate() {
               }));
             } else if (event.stage === 'report_complete') {
               setDebateState((prev) => {
-                // Save completed debate to history
-                const historyEntry: DebateHistoryEntry = {
-                  id: Date.now().toString(),
-                  question: prev.selectedQuestion || question,
-                  timestamp: new Date(),
-                  postures: prev.postures || [],
-                  topics: prev.topics || [],
-                  arguments: prev.arguments || [],
-                  verdict: prev.verdict!,
-                  report: event.data.report,
-                };
+                // Only save to history if we have all required data
+                const newHistory = prev.verdict && prev.arguments && prev.postures && prev.topics
+                  ? [{
+                      id: Date.now().toString(),
+                      question: prev.selectedQuestion || question,
+                      timestamp: new Date(),
+                      postures: prev.postures,
+                      topics: prev.topics,
+                      arguments: prev.arguments,
+                      verdict: prev.verdict,
+                      report: event.data.report,
+                    }, ...prev.history]
+                  : prev.history;
 
                 return {
                   ...prev,
                   status: 'completed',
                   progress: 'Debate report ready!',
                   report: event.data.report,
-                  history: [historyEntry, ...prev.history],
+                  history: newHistory,
                 };
               });
               setLoading(false);
