@@ -9,7 +9,6 @@ import agentRoutes from './routes/agentRoutes';
 import capabilityRoutes from './routes/capabilityRoutes';
 import canvasRoutes from './routes/canvasRoutes';
 import paperRoutes from './routes/paperRoutes';
-import debateRoutes from './routes/debateRoutes';
 import masDebateRoutes from './routes/masDebateRoutes';
 
 // WebSocket
@@ -67,7 +66,6 @@ app.get('/api', (req, res) => {
       papers: '/api/papers',
       agents: '/api/agents',
       capabilities: '/api/capabilities',
-      debate: '/api/debate',
       masDebate: '/api/mas-debate',
     },
   });
@@ -78,7 +76,6 @@ app.use('/api/canvas', canvasRoutes);
 app.use('/api/papers', paperRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/capabilities', capabilityRoutes);
-app.use('/api/debate', debateRoutes);
 app.use('/api/mas-debate', masDebateRoutes);
 
 // 404 handler
