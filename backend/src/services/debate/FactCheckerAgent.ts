@@ -3,7 +3,9 @@ import { BaseDebateAgent } from "./BaseDebateAgent";
 import {
   DebaterArgument,
   WebSearchResult,
+  Paper,
 } from "../../types/debate.types";
+import { webSearch } from "./webSearchService";
 
 export type FactCheckStatus = "True" | "False" | "Uncertain" | "NotApplicable";
 
@@ -43,10 +45,235 @@ export type FactCheckSummary = {
 
 export interface FactCheckRequest {
   arguments: DebaterArgument[];
+  paper: Paper;
 }
 
 export class FactCheckerAgent extends BaseDebateAgent {
+  /**
+   * Intelligent fact-checking that only verifies claims that:
+   * 1. Sound like they could be false
+   * 2. Are not directly from the paper
+   * 3. Make specific external factual assertions
+   */
   async checkFacts(request: FactCheckRequest): Promise<FactCheckSummary> {
+    const { arguments: debaterArguments, paper } = request;
+    
+    console.log(`[FactChecker] Starting intelligent fact-check for ${debaterArguments.length} debaters...`);
+
+    const factCheckSummary: DebaterFactCheck[] = [];
+
+    for (const arg of debaterArguments) {
+      console.log(`[FactChecker] Checking posture: ${arg.posture}`);
+      
+      const debaterCheck: DebaterFactCheck = {
+        posture: arg.posture,
+        perTopic: [],
+        totals: {
+          meanFactualScore: 0,
+          trueTotal: 0,
+          falseTotal: 0,
+        },
+      };
+
+      for (const topicArg of arg.perTopic) {
+        const topicCheck: TopicFactCheck = {
+          topic: topicArg.topic,
+          checkedClaims: [],
+          topicVerdict: {
+            trueCount: 0,
+            falseCount: 0,
+            uncertainCount: 0,
+            verifiableCount: 0,
+            factualScore: 0,
+          },
+        };
+
+        // Check if this claim needs fact-checking
+        const needsFactCheck = await this.shouldFactCheck(paper, topicArg.claim, topicArg.reasoning);
+        
+        if (!needsFactCheck.shouldCheck) {
+          console.log(`[FactChecker] Skipping topic "${topicArg.topic}": ${needsFactCheck.reason}`);
+          
+          topicCheck.checkedClaims.push({
+            claim: topicArg.claim.slice(0, 200),
+            verifiable: false,
+            status: "NotApplicable",
+            evidence: [],
+            notes: needsFactCheck.reason,
+          });
+        } else {
+          console.log(`[FactChecker] Checking topic "${topicArg.topic}": ${needsFactCheck.reason}`);
+          
+          // Perform web search to verify the suspicious claim
+          const searchQuery = needsFactCheck.extractedClaim || topicArg.claim;
+          const searchResults = await webSearch(searchQuery, 3);
+          
+          // Check if we got real results (not fallback)
+          const isRealSearch = searchResults.length > 0 && searchResults[0].url !== "";
+          
+          if (isRealSearch) {
+            topicCheck.topicVerdict.verifiableCount++;
+            
+            // Use LLM to analyze if the search results support or refute the claim
+            const verification = await this.verifyClaimWithEvidence(
+              searchQuery,
+              searchResults
+            );
+            
+            if (verification.status === "True") {
+              topicCheck.topicVerdict.trueCount++;
+            } else if (verification.status === "False") {
+              topicCheck.topicVerdict.falseCount++;
+            } else {
+              topicCheck.topicVerdict.uncertainCount++;
+            }
+            
+            topicCheck.checkedClaims.push({
+              claim: searchQuery.slice(0, 200),
+              verifiable: true,
+              status: verification.status,
+              evidence: searchResults.slice(0, 2),
+              notes: verification.notes,
+            });
+          } else {
+            topicCheck.checkedClaims.push({
+              claim: searchQuery.slice(0, 200),
+              verifiable: false,
+              status: "Uncertain",
+              evidence: [],
+              notes: "Could not find external sources to verify this claim.",
+            });
+          }
+        }
+
+        if (topicCheck.topicVerdict.verifiableCount > 0) {
+          topicCheck.topicVerdict.factualScore =
+            (topicCheck.topicVerdict.trueCount + topicCheck.topicVerdict.uncertainCount * 0.5) / 
+            topicCheck.topicVerdict.verifiableCount;
+        }
+
+        debaterCheck.perTopic.push(topicCheck);
+      }
+
+      // Calculate debater totals
+      const totalVerifiable = debaterCheck.perTopic.reduce((sum, tc) => sum + tc.topicVerdict.verifiableCount, 0);
+      const totalTrue = debaterCheck.perTopic.reduce((sum, tc) => sum + tc.topicVerdict.trueCount, 0);
+      const totalFalse = debaterCheck.perTopic.reduce((sum, tc) => sum + tc.topicVerdict.falseCount, 0);
+
+      debaterCheck.totals.trueTotal = totalTrue;
+      debaterCheck.totals.falseTotal = totalFalse;
+      if (totalVerifiable > 0) {
+        const totalUncertain = debaterCheck.perTopic.reduce((sum, tc) => sum + tc.topicVerdict.uncertainCount, 0);
+        debaterCheck.totals.meanFactualScore = (totalTrue + totalUncertain * 0.5) / totalVerifiable;
+      }
+
+      factCheckSummary.push(debaterCheck);
+    }
+
+    console.log(`[FactChecker] Fact-check complete!`);
+    
+    return { factCheckSummary };
+  }
+
+  /**
+   * Determines if a claim needs fact-checking using LLM
+   */
+  private async shouldFactCheck(
+    paper: Paper,
+    claim: string,
+    reasoning: string
+  ): Promise<{ shouldCheck: boolean; reason: string; extractedClaim?: string }> {
+    const prompt = `Analyze this debate claim about the paper and determine if it needs fact-checking.
+PAPER TITLE: "${paper.title}"
+PAPER CONTENT: "${paper.text}"
+
+CLAIM: "${claim}"
+REASONING: "${reasoning}"
+
+A claim needs fact-checking if it:
+- Makes specific factual assertions that could be false (statistics, dates, specific events)
+- References external sources, studies, or real-world data not from the paper
+- Makes claims about what "research shows" or "studies indicate" without paper citations
+- Contains potentially verifiable facts about the real world
+
+A claim does NOT need fact-checking if it:
+- Is purely theoretical, philosophical, or opinion-based
+- Is directly supported by paper citations (already verified)
+- Uses hedging language like "may", "could", "suggests", "likely"
+- Is about the paper's own methodology or findings (internal to paper)
+- Is common knowledge or definitional
+
+Return JSON:
+{
+  "shouldCheck": boolean,
+  "reason": string (brief explanation),
+  "extractedClaim": string | null (if shouldCheck=true, extract the specific factual claim to verify)
+}`;
+
+    try {
+      const response = await this.callOpenAIWithJsonResponse<{
+        shouldCheck: boolean;
+        reason: string;
+        extractedClaim?: string;
+      }>([{ role: "user", content: prompt }], this.getSystemPrompt());
+
+      return response;
+    } catch (error) {
+      console.error("[FactChecker] Error in shouldFactCheck:", error);
+      // Default to not checking if there's an error
+      return {
+        shouldCheck: false,
+        reason: "Error analyzing claim",
+      };
+    }
+  }
+
+  /**
+   * Verifies a claim against web search evidence using LLM
+   */
+  private async verifyClaimWithEvidence(
+    claim: string,
+    evidence: WebSearchResult[]
+  ): Promise<{ status: FactCheckStatus; notes: string }> {
+    const prompt = `Verify this claim against the provided web search evidence.
+
+CLAIM: "${claim}"
+
+EVIDENCE:
+${evidence.map((e, i) => `${i + 1}. ${e.title}\n   ${e.snippet}\n   Source: ${e.url}`).join("\n\n")}
+
+Based on the evidence:
+- If 2+ sources clearly support the claim → status: "True"
+- If 2+ sources clearly contradict the claim → status: "False"  
+- If evidence is mixed, unclear, or insufficient → status: "Uncertain"
+
+Return JSON:
+{
+  "status": "True" | "False" | "Uncertain",
+  "notes": string (brief explanation of why, citing source numbers)
+}`;
+
+    try {
+      const response = await this.callOpenAIWithJsonResponse<{
+        status: FactCheckStatus;
+        notes: string;
+      }>([{ role: "user", content: prompt }], this.getSystemPrompt());
+
+      return response;
+    } catch (error) {
+      console.error("[FactChecker] Error in verifyClaimWithEvidence:", error);
+      return {
+        status: "Uncertain",
+        notes: "Error analyzing evidence",
+      };
+    }
+  }
+
+  /**
+   * OLD IMPLEMENTATION - kept for reference but not used
+   * This was too slow because it required many LLM calls with tool use
+   */
+  private async checkFactsWithLLM(request: FactCheckRequest): Promise<FactCheckSummary> {
     const { arguments: debaterArguments } = request;
 
     const systemPrompt = `${this.getSystemPrompt()}
@@ -220,7 +447,7 @@ For each debater and each topic, identify verifiable factual claims and check th
         let result: any;
 
         if (toolName === "webSearch") {
-          result = await this.webSearch(toolInput.query);
+          result = await webSearch(toolInput.query);
         } else {
           result = { error: "Unknown tool" };
         }
@@ -240,23 +467,5 @@ For each debater and each topic, identify verifiable factual claims and check th
     return finalResponse;
   }
 
-  private async webSearch(query: string): Promise<WebSearchResult[]> {
-    console.log('[FactCheckerAgent] Web searching for fact-check:', query);
-
-    // Mock web search implementation
-    // In production, this would call a real search API (Google, Bing, Tavily, etc.)
-    return [
-      {
-        title: `Fact-check: ${query}`,
-        url: `https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`,
-        snippet: `Mock fact-check result for "${query}". In production, this would return real web search results from reliable sources like academic databases, .edu/.gov sites, and reputable news outlets.`,
-      },
-      {
-        title: `${query} - Verification`,
-        url: `https://www.semanticscholar.org/search?q=${encodeURIComponent(query)}`,
-        snippet: `Additional verification context for ${query}. This demonstrates the fact-checking capability with multiple sources.`,
-      },
-    ];
-  }
 }
 

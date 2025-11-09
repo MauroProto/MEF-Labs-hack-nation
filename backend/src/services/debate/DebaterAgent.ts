@@ -7,6 +7,7 @@ import {
   Paper,
   WebSearchResult,
 } from "../../types/debate.types";
+import { webSearch } from "./webSearchService";
 
 export class DebaterAgent extends BaseDebateAgent {
   private paper!: Paper;
@@ -19,7 +20,7 @@ export class DebaterAgent extends BaseDebateAgent {
 
 ### ROLE
 
-You are the **Debater Agent** defending the following *posture*:
+    You are the **Debater Agent** defending the following *posture*:
 
 > "${posture}"
 
@@ -224,7 +225,7 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
             content: JSON.stringify(result),
           });
         } else if (toolName === "webSearch") {
-          result = await this.webSearch(toolInput.query);
+          result = await webSearch(toolInput.query);
 
           messages.push({
             role: "tool",
@@ -283,55 +284,5 @@ Argue from your posture perspective, addressing each topic with claims, reasonin
     return chunks.sort((a, b) => b.score - a.score).slice(0, 5);
   }
 
-  private async webSearch(query: string): Promise<WebSearchResult[]> {
-    // Simple web search implementation using Tavily API or similar
-    // For now, return mock data that the debater can use
-    // In production, integrate with Tavily, Google Search API, or similar
-
-    try {
-      // If TAVILY_API_KEY is set, use real search
-      if (process.env.TAVILY_API_KEY) {
-        const response = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            api_key: process.env.TAVILY_API_KEY,
-            query,
-            search_depth: "basic",
-            max_results: 5,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          return data.results.map((r: any) => ({
-            title: r.title,
-            url: r.url,
-            snippet: r.content,
-          }));
-        }
-      }
-
-      // Fallback: return helpful message
-      return [
-        {
-          title: "Web search not configured",
-          url: "",
-          snippet: `Web search for "${query}" requires TAVILY_API_KEY environment variable to be set. Using paper citations only.`,
-        },
-      ];
-    } catch (error) {
-      console.error("Web search error:", error);
-      return [
-        {
-          title: "Web search error",
-          url: "",
-          snippet: "Unable to perform web search at this time. Using paper citations only.",
-        },
-      ];
-    }
-  }
 }
 
