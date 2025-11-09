@@ -11,7 +11,19 @@ export class JudgeAgent extends BaseDebateAgent {
 
     const systemPrompt = `${this.getSystemPrompt()}
 
-Score each debater per topic using the provided rubric. Scores are within [0,1]. Include notes explaining deductions. Then compute weighted totals and select a bestOverall posture, and list insights (novel, actionable, non-obvious) that are well-supported across arguments.
+You are an expert judge evaluating debate arguments. Score each debater per topic using the provided rubric.
+
+SCORING GUIDELINES:
+- Use the full range from 0.0 to 1.0 (0% to 100%)
+- 0.9-1.0 = Exceptional (outstanding evidence, flawless logic, comprehensive coverage)
+- 0.7-0.9 = Strong (good evidence, solid reasoning, thorough)
+- 0.5-0.7 = Adequate (some evidence, decent reasoning, partial coverage)
+- 0.3-0.5 = Weak (limited evidence, flawed reasoning, gaps)
+- 0.0-0.3 = Poor (no evidence, faulty logic, minimal coverage)
+
+Be discerning but fair. Well-argued positions with good evidence should score 0.7-0.9. Only perfect arguments deserve 1.0.
+
+Include specific notes explaining each score. Compute weighted totals, select the bestOverall posture, and list key insights.
 
 Output ONLY valid JSON that conforms to this schema:
 {
