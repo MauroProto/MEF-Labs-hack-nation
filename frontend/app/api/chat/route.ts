@@ -39,19 +39,38 @@ Please answer questions about this paper accurately and helpfully. Format your r
         : 'You are a helpful research assistant. Format your responses in markdown.',
     };
 
-    // Call OpenAI with conversation history
-    const completion = await openai.chat.completions.create({
+    // Call OpenAI with streaming enabled
+    const stream = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [systemMessage, ...messages],
       temperature: 0.7,
       max_tokens: 2000,
+      stream: true,
     });
 
-    const assistantMessage = completion.choices[0]?.message?.content || 'No response generated.';
+    // Create a readable stream for the response
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+              controller.enqueue(encoder.encode(content));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    });
 
-    return NextResponse.json({
-      message: assistantMessage,
-      usage: completion.usage,
+    return new Response(readableStream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+      },
     });
   } catch (error: any) {
     console.error('Chat API error:', error);
