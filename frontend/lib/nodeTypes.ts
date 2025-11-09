@@ -20,6 +20,7 @@ import {
   Sparkles,
   HelpCircle,
   LinkIcon,
+  Scale,
 } from 'lucide-react';
 
 /**
@@ -32,6 +33,7 @@ export type NodeType =
   // Research nodes
   | 'paper-chat'
   | 'web-research'
+  | 'debate'
   // Agent nodes
   | 'researcher-agent'
   | 'critic-agent'
@@ -128,6 +130,18 @@ export const NODE_CONFIGS: Record<NodeType, NodeConfig> = {
     color: NODE_COLORS.research,
     defaultWidth: 380,
     defaultHeight: 450,
+    hasInput: true,
+    hasOutput: true,
+  },
+  debate: {
+    type: 'debate',
+    label: 'Academic Debate',
+    description: 'Multi-agent debate system with 3 AI perspectives',
+    category: 'research',
+    icon: Scale,
+    color: NODE_COLORS.research,
+    defaultWidth: 500,
+    defaultHeight: 700,
     hasInput: true,
     hasOutput: true,
   },

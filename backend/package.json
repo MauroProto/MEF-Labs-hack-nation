@@ -30,7 +30,7 @@
     "nanoid": "^5.1.6",
     "openai": "^6.7.0",
     "papaparse": "^5.5.3",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^1.1.4",
     "socket.io": "^4.8.1",
     "tavily": "^1.0.2",
     "zod": "^3.23.8"
@@ -41,7 +41,7 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.14.0",
     "@types/papaparse": "^5.3.14",
-    "@types/pdf-parse": "^1.1.4",
+    "@types/pdf-parse": "^1.1.5",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
     "eslint": "^8.57.0",
