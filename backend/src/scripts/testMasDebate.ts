@@ -147,22 +147,36 @@ than architectures based on recurrent or convolutional layers.
         console.log(`   Claim: ${topicArg.claim}`);
         console.log(`   Reasoning: ${topicArg.reasoning}`);
         
+        // Show counterpoints
+        if (topicArg.counterpoints && topicArg.counterpoints.length > 0) {
+          console.log(`\n   🔄 Counterpoints (${topicArg.counterpoints.length}):`);
+          topicArg.counterpoints.forEach((cp, k) => {
+            console.log(`      ${k + 1}. ${cp}`);
+          });
+        }
+        
         // Show paper citations
-        if (topicArg.cites.paper && topicArg.cites.paper.length > 0) {
-          console.log(`\n   📚 Paper Citations (${topicArg.cites.paper.length}):`);
-          topicArg.cites.paper.forEach((cite, k) => {
-            console.log(`      ${k + 1}. [${cite.chunkId}] (score: ${cite.score.toFixed(2)})`);
-            console.log(`         "${cite.text.slice(0, 150)}${cite.text.length > 150 ? '...' : ''}"`);
+        if (topicArg.citations?.paper && topicArg.citations.paper.length > 0) {
+          console.log(`\n   📚 Paper Citations (${topicArg.citations.paper.length}):`);
+          topicArg.citations.paper.forEach((cite, k) => {
+            const score = cite.score !== undefined ? cite.score.toFixed(2) : 'N/A';
+            const chunkId = cite.chunkId || 'unknown';
+            const text = cite.text || '';
+            console.log(`      ${k + 1}. [${chunkId}] (score: ${score})`);
+            console.log(`         "${text.slice(0, 150)}${text.length > 150 ? '...' : ''}"`);
           });
         }
         
         // Show web citations
-        if (topicArg.cites.web && topicArg.cites.web.length > 0) {
-          console.log(`\n   🌐 Web Citations (${topicArg.cites.web.length}):`);
-          topicArg.cites.web.forEach((cite, k) => {
-            console.log(`      ${k + 1}. ${cite.title}`);
-            console.log(`         URL: ${cite.url}`);
-            console.log(`         Snippet: "${cite.snippet.slice(0, 150)}${cite.snippet.length > 150 ? '...' : ''}"`);
+        if (topicArg.citations?.web && topicArg.citations.web.length > 0) {
+          console.log(`\n   🌐 Web Citations (${topicArg.citations.web.length}):`);
+          topicArg.citations.web.forEach((cite, k) => {
+            const title = cite.title || 'Untitled';
+            const url = cite.url || '';
+            const snippet = cite.snippet || '';
+            console.log(`      ${k + 1}. ${title}`);
+            console.log(`         URL: ${url}`);
+            console.log(`         Snippet: "${snippet.slice(0, 150)}${snippet.length > 150 ? '...' : ''}"`);
           });
         }
       });
@@ -170,12 +184,52 @@ than architectures based on recurrent or convolutional layers.
     });
     console.log('='.repeat(80) + '\n');
 
-    // Test 4: Judge Debate
-    console.log('⚖️  Step 4: Judging arguments...');
+    // Test 4: Fact-Check Arguments
+    console.log('🔍 Step 4: Fact-checking arguments...');
+    const factCheck = await coordinator.factCheckArguments(debaterArguments);
+    console.log(`✅ Fact-checking complete!\n`);
+
+    // Display fact-check summary
+    console.log('='.repeat(80));
+    console.log('FACT-CHECK SUMMARY');
+    console.log('='.repeat(80));
+    
+    factCheck.factCheckSummary.forEach((debaterCheck, i) => {
+      console.log(`\n${'─'.repeat(80)}`);
+      console.log(`DEBATER: ${debaterCheck.posture}`);
+      console.log(`${'─'.repeat(80)}`);
+      console.log(`\nOverall Factual Score: ${debaterCheck.totals.meanFactualScore.toFixed(3)}`);
+      console.log(`True Claims: ${debaterCheck.totals.trueTotal}`);
+      console.log(`False Claims: ${debaterCheck.totals.falseTotal}`);
+      
+      debaterCheck.perTopic.forEach((topicCheck, j) => {
+        console.log(`\n  📌 Topic: ${topicCheck.topic}`);
+        console.log(`     Factual Score: ${topicCheck.topicVerdict.factualScore.toFixed(2)}`);
+        console.log(`     Verifiable Claims: ${topicCheck.topicVerdict.verifiableCount}`);
+        console.log(`     True: ${topicCheck.topicVerdict.trueCount}, False: ${topicCheck.topicVerdict.falseCount}, Uncertain: ${topicCheck.topicVerdict.uncertainCount}`);
+        
+        if (topicCheck.checkedClaims.length > 0) {
+          console.log(`\n     Checked Claims:`);
+          topicCheck.checkedClaims.forEach((checkedClaim, k) => {
+            console.log(`       ${k + 1}. [${checkedClaim.status}] ${checkedClaim.claim.slice(0, 100)}${checkedClaim.claim.length > 100 ? '...' : ''}`);
+            if (checkedClaim.notes) {
+              console.log(`          Notes: ${checkedClaim.notes}`);
+            }
+          });
+        }
+      });
+      console.log();
+    });
+    
+    console.log('='.repeat(80) + '\n');
+
+    // Test 5: Judge Debate (with fact-check results)
+    console.log('⚖️  Step 5: Judging arguments (with fact-check results)...');
     const verdict = await coordinator.judgeDebate(
       selectedQuestion,
       topics,
-      debaterArguments
+      debaterArguments,
+      factCheck
     );
     console.log(`✅ Judging complete!`);
     console.log(`   Best posture: ${verdict.bestOverall}`);
@@ -217,10 +271,17 @@ than architectures based on recurrent or convolutional layers.
       console.log(`${i + 1}. ${insight}`);
     });
     
+    if (verdict.controversialPoints && verdict.controversialPoints.length > 0) {
+      console.log(`\n⚠️  CONTROVERSIAL POINTS:`);
+      verdict.controversialPoints.forEach((point, i) => {
+        console.log(`${i + 1}. ${point}`);
+      });
+    }
+    
     console.log('\n' + '='.repeat(80) + '\n');
 
-    // Test 5: Generate Report
-    console.log('📊 Step 5: Generating final report...');
+    // Test 6: Generate Report
+    console.log('📊 Step 6: Generating final report...');
     const report = await coordinator.generateReport(
       selectedQuestion,
       topics,
