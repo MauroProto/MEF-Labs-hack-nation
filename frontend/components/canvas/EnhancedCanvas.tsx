@@ -94,6 +94,10 @@ export function EnhancedCanvas() {
           type: nodeType as any,
           config,
         },
+        style: {
+          width: config.defaultWidth,
+          height: config.defaultHeight,
+        },
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -131,6 +135,10 @@ export function EnhancedCanvas() {
         label: String(config.label), // Ensure it's a string
         type: nodeType as any,
         config,
+      },
+      style: {
+        width: config.defaultWidth,
+        height: config.defaultHeight,
       },
     };
 
